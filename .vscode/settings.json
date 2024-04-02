@@ -54,6 +54,29 @@
         "xlocnum": "cpp",
         "xmemory": "cpp",
         "xstddef": "cpp",
-        "xtr1common": "cpp"
-    }
+        "xtr1common": "cpp",
+        "fpioa.h": "c",
+        "plic.h": "c",
+        "dmac.h": "c",
+        "uarths.h": "c",
+        "spi.h": "c",
+        "bsp.h": "c",
+        "sipeed_spi.h": "c",
+        "configboard.h": "c",
+        "device_config.h": "c",
+        "stdlib.h": "c",
+        "w25qxx.h": "c",
+        "stdint.h": "c",
+        "flash.h": "c",
+        "face_recognition.h": "c",
+        "sleep.h": "c",
+        "st7789.h": "c",
+        "syslog.h": "c",
+        "*.tcc": "c",
+        "string_view": "c",
+        "valarray": "c",
+        "imdefs.h": "c"
+    },
+    "DevChat.PythonForCommands": "C:\\Users\\wangy\\.chat\\mamba\\envs\\devchat-commands\\python.exe",
+    "DevChat.PythonForChat": "c:\\Users\\wangy\\.vscode\\extensions\\merico.devchat-0.1.47\\tools\\python-3.11.6-embed-amd64\\python.exe"
 }

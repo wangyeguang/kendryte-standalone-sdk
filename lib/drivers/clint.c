@@ -217,6 +217,7 @@ int clint_ipi_unregister(void)
     return clint_ipi_register(NULL, NULL);
 }
 
+#if 0
 uintptr_t handle_irq_m_timer(uintptr_t cause, uintptr_t epc)
 {
     /* Read core id */
@@ -257,3 +258,4 @@ uintptr_t handle_irq_m_soft(uintptr_t cause, uintptr_t epc)
     set_csr(mie, MIP_MSIP);
     return epc;
 }
+#endif
