@@ -75,8 +75,19 @@
         "*.tcc": "c",
         "string_view": "c",
         "valarray": "c",
-        "imdefs.h": "c"
+        "imdefs.h": "c",
+        "cambus.h": "c",
+        "random": "c",
+        "*.bak": "c",
+        "image.h": "c",
+        "gpiohs.h": "c",
+        "rtc.h": "c",
+        "region_layer.h": "c",
+        "esp8285.h": "c",
+        "functional": "c",
+        "variant": "c"
     },
     "DevChat.PythonForCommands": "C:\\Users\\wangy\\.chat\\mamba\\envs\\devchat-commands\\python.exe",
-    "DevChat.PythonForChat": "c:\\Users\\wangy\\.vscode\\extensions\\merico.devchat-0.1.47\\tools\\python-3.11.6-embed-amd64\\python.exe"
+    "DevChat.PythonForChat": "c:\\Users\\wangy\\.vscode\\extensions\\merico.devchat-0.1.47\\tools\\python-3.11.6-embed-amd64\\python.exe",
+    "Codegeex.CompletionModel": "CodeGeeX Pro[Beta]"
 }

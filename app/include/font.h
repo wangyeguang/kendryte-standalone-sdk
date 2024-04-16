@@ -9,6 +9,8 @@
 // #include "imlib.h"
 
 
+
+
 enum FontIndex {
     ASCII,
     Unicode,
@@ -24,6 +26,7 @@ enum FontSource {
     ArrayIn,
 };
 
+extern uint8_t const ascii0816[];
 //source_type default ArrayIn
 void font_load(uint8_t index, uint8_t width, uint8_t high, uint8_t source_type, void *src_addr);
 void font_free();

@@ -2,7 +2,7 @@
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-02 16:23:27
  * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-04-02 18:24:14
+ * @LastEditTime: 2024-04-03 11:02:28
  * @FilePath: \kendryte-standalone-sdk\app\include\lcd.h
  * @Description: 
  * 
@@ -110,69 +110,14 @@ typedef enum _lcd_dir
     DIR_RGB2BRG = 0x08, // lcd_set_direction(DIR_YX_RLUD | DIR_RGB2BRG); // 0x28
 } lcd_dir_t;
 
-//屏幕参数结构体
-typedef struct
-{	//基础参数
-	// Hardward Interface config
-    uint8_t rst_pin;
-    uint8_t dcx_pin;
-    uint8_t cs_pin; // cs or nss
-    uint8_t bl_pin;
-    uint8_t clk_pin;
-    uint32_t freq; //频率
-    // LCD parmater config
-    uint16_t height;
-    uint16_t width;
-    uint16_t offset_h0;
-    uint16_t offset_w0;
-    uint16_t offset_h1;
-    uint16_t offset_w1;
-
-    lcd_type_t lcd_type;
-	bool oct; // 是否使用非标准 spi
-    lcd_dir_t dir;
-    bool invert; // corlor invert
-	//扩展参数
-	void* extra_para;
-}lcd_para_t;
-
-typedef struct
-{
-    // 屏幕参数
-	lcd_para_t* lcd_para;
-
-	// setting
-	int (*init)(lcd_para_t* lcd_para); // 初始化屏幕
-	void (*deinit)(void); // 释放屏幕
-	void (*set_direction)(lcd_dir_t dir); // 设置屏幕方向
-	void (*bgr_to_rgb)(bool enable); // 是否将 bgr 数据转 rgb 后显示
-	void (*set_offset)(uint16_t offset_w, uint16_t offset_h); // 设置屏幕偏移量
-	void (*set_freq)(uint32_t freq);// 设置 spi 速率, hz 为单位
-	uint32_t (*get_freq)(void); // 获取当前速率
-	uint16_t (*get_width)(void); // 获取当前屏幕宽度
-	uint16_t (*get_height)(void); // 获取当前屏幕高度
-	
-	// ui
-	void (*clear)(uint16_t rgb565_color); // 清屏
-	void (*draw_point)(uint16_t x, uint16_t y, uint16_t color); 
-	// void (*draw_string)(uint16_t x, uint16_t y, char *str, uint16_t color);
-	void (*draw_picture)(uint16_t x,uint16_t y,uint16_t w,uint16_t h,uint8_t *img);
-	void (*draw_pic_roi)(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t rx, uint16_t ry, uint16_t rw, uint16_t rh, uint8_t *img);
-	void (*draw_pic_gray)(uint16_t x1, uint16_t y1, uint16_t w, uint16_t h, uint8_t *img);
-	void (*draw_pic_grayroi)(uint16_t x, uint16_t y, uint16_t w, uint16_t h, uint16_t rx, uint16_t ry, uint16_t rw, uint16_t rh, uint8_t *img);
-	void (*fill_rectangle)(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t color);
-} lcd_t;
-
-extern lcd_t lcd_mcu;
-extern lcd_t lcd_rgb;
-
-// 当前的 lcd 屏，全局唯一
-extern lcd_t *lcd;
-void lcd_init(void);
+int lcd_init(void);
 void lcd_deinit(void);
 void lcd_width(void);
 void lcd_height(void);
-void lcd_display(uint8_t *image);
+// void lcd_display(uint8_t *image);
+void lcd_draw_point(uint16_t x, uint16_t y, uint16_t color);
+void lcd_draw_string(uint16_t x, uint16_t y, char *str, uint16_t color);
+void lcd_draw_picture(uint16_t x1, uint16_t y1, uint16_t width, uint16_t height, uint8_t *ptr);
 void lcd_clear(uint16_t rgb565_color);
 void lcd_set_rotation(uint8_t rotate);
 void lcd_bgr_to_rgb(bool enable);
