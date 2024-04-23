@@ -4,6 +4,7 @@
 set(BUILDING_SDK "yes" CACHE INTERNAL "")
 
 # basic config
+# set(PROJ app)
 if (NOT PROJ)
     get_filename_component(PROJ ${CMAKE_CURRENT_BINARY_DIR} DIRECTORY)
     get_filename_component(PROJ ${PROJ} NAME)
@@ -12,15 +13,16 @@ if (NOT PROJ)
 else()
     message("PROJ = ${PROJ}")
 endif ()
+
 cmake_minimum_required(VERSION 3.0)
 include(./cmake/common.cmake)
 project(${PROJ} C CXX ASM)
-
 # config self use headers
 include(./cmake/macros.internal.cmake)
 header_directories(${SDK_ROOT}/lib)
-header_directories(${PROJ})
-header_directories(${PROJ}/include)
+header_directories(src/${PROJ})
+header_directories(src/${PROJ}/include)
+header_directories(src/${PROJ}/ai)
 # header_directories(src/${PROJ})
 # header_directories(kendryte-standalone-demo/${PROJ})
 
@@ -31,15 +33,28 @@ add_subdirectory(third_party/nlohmann_json)
 add_subdirectory(lib)
 
 # 添加编译选项
-# add_compile_options(-Wl,--print-memory-usage)
 # add_definitions(-DCONFIG_LOG_ENABLE=1)
 # add_definitions(-DCONFIG_LOG_LEVEL=LOG_DEBUG)
 # compile project
-# add_source_files(src/${PROJ}/*.c src/${PROJ}/*.s src/${PROJ}/*.S src/${PROJ}/*.cpp)
-add_source_files(${PROJ}/src/*.c ${PROJ}/src/*.cpp)
+add_source_files(src/${PROJ}/*.c src/${PROJ}/*.s src/${PROJ}/*.S src/${PROJ}/*.cpp src/${PROJ}/ai/*.c)
+# add_source_files(${PROJ}/src/*.c ${PROJ}/src/*.cpp ${PROJ}/src/*.s ${PROJ}/src/*.S ${PROJ}/ai/*.c)
 # add_source_files(kendryte-standalone-demo/${PROJ}/*.c kendryte-standalone-demo/${PROJ}/*.s kendryte-standalone-demo/${PROJ}/*.S kendryte-standalone-demo/${PROJ}/*.cpp)
-include(./cmake/executable.cmake)
+# add_executable(app ${PROJ}/src/*.c ${PROJ}/src/*.cpp ${PROJ}/src/*.s ${PROJ}/src/*.S ${PROJ}/ai/*.c)
 
+# 
+include(./cmake/executable.cmake)
+# file(TO_CMAKE_PATH "${PROJ}/ai/libai.a" LIBAI_PATH)
+# target_link_libraries(${PROJ} STATIC ${LIBAI_PATH})
+# set(LIBRARY_PATH ${PORJ}/ai)
+set(STATIC_LIB libai.a)
+target_link_directories(${PROJ} PRIVATE  src/${PROJ}/ai)
+target_link_libraries(${PROJ} ${STATIC_LIB})
+
+
+# 添加链接选项
+target_link_options(${PROJ} PRIVATE -Wl,--print-memory-usage)
+
+add_compile_options(-Wl,--print-memory-usage)
 # add_custom_command(TARGET app POST_BUILD
 #         COMMAND ${CMAKE_OBJCOPY} -I binary -O elf64-littleriscv -B riscv $<TARGET_FILE:app>.bin $<TARGET_FILE:app>.elf)
 # add_custom_target(print_size

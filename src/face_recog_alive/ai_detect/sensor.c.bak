@@ -1,0 +1,553 @@
+/*
+ * @Author: yeguang wang wangyeguang521@163.com
+ * @Date: 2024-04-03 11:54:05
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-04-08 18:52:31
+ * @FilePath: \kendryte-standalone-sdk\app\src\sensor.c.bak
+ * @Description: 
+ * 
+ * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+ */
+#include "sensor.h"
+#include "gc0328.h"
+#include "dvp.h"
+#include "fpioa.h"
+#include "i2c.h"
+#include "sipeed_i2c.h"
+#include "sleep.h"
+
+#define SENSOR_HW_FLAGS_VSYNC        (0) // vertical sync polarity.
+#define SENSOR_HW_FLAGS_HSYNC        (1) // horizontal sync polarity.
+#define SENSOR_HW_FLAGS_PIXCK        (2) // pixel clock edge.
+#define SENSOR_HW_FLAGS_FSYNC        (3) // hardware frame sync.
+#define SENSOR_HW_FLAGS_JPEGE        (4) // hardware JPEG encoder.
+#define SENSOR_HW_FLAGS_GET(s, x)    ((s)->hw_flags &  (1<<x))
+#define SENSOR_HW_FLAGS_SET(s, x, v) ((s)->hw_flags |= (v<<x))
+#define SENSOR_HW_FLAGS_CLR(s, x)    ((s)->hw_flags &= ~(1<<x))
+
+#define DCMI_RESET_LOW()      dvp->cmos_cfg &= ~DVP_CMOS_RESET
+#define DCMI_RESET_HIGH()     dvp->cmos_cfg |= DVP_CMOS_RESET
+#define DCMI_PWDN_LOW()       dvp->cmos_cfg &= ~DVP_CMOS_POWER_DOWN
+#define DCMI_PWDN_HIGH()      dvp->cmos_cfg |= DVP_CMOS_POWER_DOWN
+
+typedef enum {
+    ACTIVE_LOW,
+    ACTIVE_HIGH,
+    ACTIVE_BINOCULAR,
+} polarity_t;
+
+volatile static uint8_t g_dvp_finish_flag = 0;
+sensor_t sensor = {0};
+
+
+
+
+int sensor_get_id()
+{
+    return sensor.chip_id;
+}
+
+int sensor_sleep(int enable)
+{
+    if (sensor.sleep == NULL || sensor.sleep(&sensor, enable) != 0)
+    {
+        //NOTE: Operation not supported
+        mp_printf(&mp_plat_print, "[CANMV]: Operation not supported.\r\n");
+        return -1;
+    }
+    return 0;
+}
+
+int sensor_read_reg(uint8_t reg_addr)
+{
+    if (sensor.read_reg == NULL)
+    {
+        //NOTE: Operation not supported
+        printf("[CANMV]: Operation not supported.\r\n");
+        return -1;
+    }
+    return sensor.read_reg(&sensor, reg_addr);
+}
+
+int sensor_write_reg(uint8_t reg_addr, uint16_t reg_data)
+{
+    if (sensor.write_reg == NULL)
+    {
+        //NOTE: Operation not supported
+        printf("[CANMV]: Operation not supported.\r\n");
+        return -1;
+    }
+    return sensor.write_reg(&sensor, reg_addr, reg_data);
+}
+
+
+static int sensor_irq(void *ctx)
+{
+#if CONFIG_MAIXPY_OMV_DOUBLE_BUFF
+    if (sensor.double_buff)
+    {
+        if (dvp_get_interrupt(DVP_STS_FRAME_FINISH))
+        {
+            //frame end
+            dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+            if ((g_sensor_buff_index_in + 1) % SENSOR_BUFFER_NUM == g_sensor_buff_index_out)
+            {
+                buff_ready = true;
+            }
+            else
+            {
+                g_sensor_buff_index_in = (g_sensor_buff_index_in + 1) % SENSOR_BUFFER_NUM;
+                buff_ready = false;
+            }
+            // g_dvp_finish_flag = 1;
+        }
+        else
+        {
+            //frame start
+            if (g_sensor_buff_index_in == g_sensor_buff_index_out)
+            {
+                if (!buff_ready)
+                {
+                    // g_dvp_finish_flag = 0;
+                    // printk("--%d\r\n",g_sensor_buff_index_in);
+                    dvp_set_ai_addr((uint32_t)MAIN_FB()->pix_ai[g_sensor_buff_index_in], (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h), (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h * 2));
+                    dvp_set_display_addr((uint32_t)MAIN_FB()->pixels[g_sensor_buff_index_in]);
+                    dvp_start_convert();
+                }
+            }
+            else
+            {
+                if (!buff_ready)
+                {
+                    // g_dvp_finish_flag = 0;
+                    // printk("==%d\r\n",g_sensor_buff_index_in);
+                    dvp_set_ai_addr((uint32_t)MAIN_FB()->pix_ai[g_sensor_buff_index_in], (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h), (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h * 2));
+                    dvp_set_display_addr((uint32_t)MAIN_FB()->pixels[g_sensor_buff_index_in]);
+                    dvp_start_convert();
+                }
+            }
+            dvp_clear_interrupt(DVP_STS_FRAME_START);
+        }
+    }
+    else
+    {
+        if (dvp_get_interrupt(DVP_STS_FRAME_FINISH))
+        {
+            //frame end
+            dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+            g_dvp_finish_flag = 1;
+        }
+        else
+        {                               //frame start
+            if (g_dvp_finish_flag == 0) //only we finish the convert, do transmit again
+                dvp_start_convert();    //so we need deal img ontime, or skip one framebefore next
+            dvp_clear_interrupt(DVP_STS_FRAME_START);
+        }
+    }
+#else
+    // sensor_t *sensor = ctx;
+    if (dvp_get_interrupt(DVP_STS_FRAME_FINISH))
+    {
+        //frame end
+        // dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 0);
+        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+        g_dvp_finish_flag = 1;
+    }
+    else
+    {                               //frame start
+        if (g_dvp_finish_flag == 0) //only we finish the convert, do transmit again
+            dvp_start_convert();    //so we need deal img ontime, or skip one framebefore next
+        dvp_clear_interrupt(DVP_STS_FRAME_START);
+    }
+#endif
+    return 0;
+}
+
+int sensor_flush(void)
+{ //flush old frame, let dvp capture new image
+    //use it when you don't snap for a while.
+    g_dvp_finish_flag = 0;
+    return 0;
+}
+
+int sensor_init_irq()
+{
+    dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 0);
+    plic_set_priority(IRQN_DVP_INTERRUPT, 2);
+    /* set irq handle */
+    plic_irq_register(IRQN_DVP_INTERRUPT, sensor_irq, NULL);
+
+    plic_irq_disable(IRQN_DVP_INTERRUPT);
+    dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+    dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
+
+    return 0;
+}
+
+int sensor_run(int enable)
+{
+    if (enable)
+    {
+        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+        plic_irq_enable(IRQN_DVP_INTERRUPT);
+        dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
+    }
+    else
+    {
+        plic_irq_disable(IRQN_DVP_INTERRUPT);
+        dvp_clear_interrupt(DVP_STS_FRAME_START | DVP_STS_FRAME_FINISH);
+        dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
+    }
+    return 0;
+}
+
+
+int sensro_gc_detect(sensor_t *sensor, bool pwnd)
+{
+    uint16_t id = 0;
+    printf( "[CANMV]: find gc sensor\r\n");
+    if (pwnd)
+        DCMI_PWDN_LOW(); //enable gc0328 要恢复 normal 工作模式，需将 PWDN pin 接入低电平即可，同时写入初始化寄存器即可
+    DCMI_RESET_LOW();    //reset gc0328
+    msleep(10);
+    DCMI_RESET_HIGH();
+    msleep(10);
+
+    int init_ret = 0;
+    /* Reset the sensor */
+    DCMI_RESET_HIGH();
+    msleep(10);
+    DCMI_RESET_LOW();
+    msleep(30);
+
+    /* Probe the ov sensor */
+    id = gc0328_read_id();
+    if (id == 0)
+    {
+        /* Sensor has been held in reset,
+           so the reset line is active low */
+        sensor->reset_pol = ACTIVE_LOW;
+
+        /* Pull the sensor out of the reset state,systick_sleep() */
+        /* Need set PWDN and RST again for some sensor*/
+        DCMI_PWDN_HIGH();
+        msleep(10);
+        DCMI_PWDN_LOW();
+        msleep(10);
+        DCMI_RESET_HIGH();
+        msleep(30);
+
+        /* Probe again to set the slave addr */
+        id = gc0328_read_id();
+        if (id == 0)
+        {
+            sensor->pwdn_pol = ACTIVE_LOW;
+            /* Need set PWDN and RST again for some sensor*/
+            DCMI_PWDN_HIGH();
+            msleep(10);
+            DCMI_RESET_LOW();
+            msleep(10);
+            DCMI_RESET_HIGH();
+            msleep(30);
+
+            id = gc0328_read_id();
+            if (id == 0)
+            {
+                sensor->reset_pol = ACTIVE_HIGH;
+
+                /* Need set PWDN and RST again for some sensor*/
+                DCMI_PWDN_LOW();
+                msleep(10);
+                DCMI_PWDN_HIGH();
+                msleep(10);
+                DCMI_RESET_LOW();
+                msleep(30);
+
+                id = gc0328_read_id();
+                if (id == 0)
+                {
+                    //should do something?
+                    return -2;
+                }
+            }
+        }
+    }
+
+    if (0 == id)
+    {
+        return -3;
+    }
+    else
+    {
+        printf( "[CANMV]: sensor id = %x\r\n", id);
+        // sensor->snapshot = sensor_snapshot;
+        // sensor->flush = sensor_flush;
+        sensor->chip_id = id;
+        sensor->gs_bpp = 2;
+        if(sensor->chip_id == GC0328_ID)
+       {            
+        
+        // sensor->slv_addr = GC0328_ADDR;
+        printf( "[CANMV]: find gc0328\r\n");
+        SENSOR_HW_FLAGS_SET(sensor, SENSOR_HW_FLAGS_VSYNC, 0);
+        SENSOR_HW_FLAGS_SET(sensor, SENSOR_HW_FLAGS_HSYNC, 0);
+        SENSOR_HW_FLAGS_SET(sensor, SENSOR_HW_FLAGS_PIXCK, 1);
+        SENSOR_HW_FLAGS_SET(sensor, SENSOR_HW_FLAGS_FSYNC, 0);
+        SENSOR_HW_FLAGS_SET(sensor, SENSOR_HW_FLAGS_JPEGE, 1);
+            }
+    }
+    return 0;
+}
+
+static int8_t i2c_pin_clk = 41;
+static  int8_t i2c_pin_sda = 42;
+
+int sensor_init_dvp(uint32_t  freq,uint32_t kpu_addr,uint32_t display_addr)
+{
+    int init_ret = 0;
+    int pwdn_lock = 0;
+
+    fpioa_set_function(47, FUNC_CMOS_PCLK);//cmos_pclk
+    fpioa_set_function(46, FUNC_CMOS_XCLK);//cmos_xclk
+    fpioa_set_function(45, FUNC_CMOS_HREF);//cmos_href
+    fpioa_set_function(44, FUNC_CMOS_PWDN);//cmos_pwdn
+    fpioa_set_function(43, FUNC_CMOS_VSYNC);//cmos_vsync
+    fpioa_set_function(17, FUNC_CMOS_RST);     //cmos_rst
+
+    dvp_init(8);
+    // if(i2c_device == -2)
+    // i2c_device = i2c_device0;
+    i2c_pin_sda = 42;
+
+    fpioa_set_function(41, FUNC_SCCB_SCLK);//i2c_pin_clk
+    fpioa_set_function(i2c_pin_sda, FUNC_SCCB_SDA);
+    maix_i2c_init(0, 7, 100000);//i2c addr= 0
+
+    // Initialize dvp interface
+    dvp_set_xclk_rate(freq);
+
+    /* Some sensors have different reset polarities, and we can't know which sensor
+    is connected before initializing cambus and probing the sensor, which in turn
+    requires pulling the sensor out of the reset state. So we try to probe the
+    sensor with both polarities to determine line state. */
+    sensor.pwdn_pol = ACTIVE_HIGH;
+    sensor.reset_pol = ACTIVE_HIGH;
+    DCMI_PWDN_HIGH();
+    msleep(10);
+    DCMI_PWDN_LOW();
+    msleep(10);
+
+    bool limit = sensor.choice_dev != 0;
+
+    // cambus_set_writeb_delay(10);
+
+    if ( 0 == sensro_gc_detect(&sensor, true))
+    // if ((limit == false || sensor.choice_dev == 2) && 0 == sensro_gc_detect(&sensor, true))
+    {
+        // cambus_set_writeb_delay(2);
+        ;
+    }
+    else
+    {
+        printf( "[CANMV]: no sensor\r\n");
+        init_ret = -1;
+    }
+    dvp_set_image_format(DVP_CFG_RGB_FORMAT);
+    dvp_disable_burst();
+	dvp_disable_auto();
+	dvp_set_output_enable(0, 1);	//enable to AI
+	dvp_set_output_enable(1, 1);	//enable to lcd
+    if(sensor.size_set)
+    {
+        dvp_set_image_size(MAIN_FB()->w_max, MAIN_FB()->h_max);
+#if CONFIG_MAIXPY_OMV_DOUBLE_BUFF
+        dvp_set_ai_addr((uint32_t)MAIN_FB()->pix_ai[g_sensor_buff_index_in], (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h), (uint32_t)(MAIN_FB()->pix_ai[g_sensor_buff_index_in] + MAIN_FB()->w * MAIN_FB()->h * 2));
+        dvp_set_display_addr((uint32_t)MAIN_FB()->pixels[g_sensor_buff_index_in]);
+#else
+        dvp_set_ai_addr(kpu_addr, kpu_addr+ 320* 240,kpu_addr+ 320 * 240 * 2);
+        dvp_set_display_addr(display_addr);
+#endif
+    }
+
+    if (pwdn_lock) (sensor.pwdn_pol == ACTIVE_HIGH) ? (DCMI_PWDN_LOW()) : (DCMI_PWDN_HIGH());
+    return init_ret;
+}
+
+/**
+ * @brief  初始化sensor
+ * @note   
+ * @param  freq: 20000000 //24000000
+ * @param  set_regs: True
+ * @param  double_buff: 双buffer
+ * @param  choice_dev: default 2
+ * @retval 
+ */
+int sensor_init(uint32_t  freq, bool double_buff,uint32_t kpu_addr,uint32_t display_addr)
+{
+    // sensor.reset_set = false;
+    // sensor.vflip = false;
+    // sensor.hmirror = false;
+    // sensor.double_buff = double_buff;
+    if(sensor_init_dvp(freq,kpu_addr,display_addr)!=0)
+    {
+        return -1;
+    }
+     // Reset the sesnor state
+    sensor.sde = 0;
+    sensor.pixformat = 0;
+    sensor.framesize = 0;
+    sensor.framerate = 0;
+    sensor.gainceiling = 0;
+    // Call sensor-specific reset function
+        if (gc0328_reset() != 0)
+        { //rst reg, set default cfg.
+            return -1;
+        }
+#if 0
+        //关闭当前sensor输出
+        sensor_write_reg(0xf1,0x00);
+        sensor_write_reg(0xf2,0x00);
+        //切换sensor
+        cambus_shutdown(1);
+        if (sensor.reset(&sensor) != 0)
+        { //rst reg, set default cfg.
+            return -1;
+        }
+        //关闭当前sensor输出
+        sensor_write_reg(0xf1,0x00);
+        sensor_write_reg(0xf2,0x00);
+        // //切换sensor
+        cambus_shutdown(0);
+        // //开启当前sensor输出
+        sensor_write_reg(0xf1,0x07);
+        sensor_write_reg(0xf2,0x01);
+#endif
+    // Disable dvp  IRQ before all cfg done
+    sensor_init_irq();
+    mp_hal_delay_ms(20);
+    sensor.reset_set = true;
+    if (sensor.size_set)
+    {
+        sensor_run(1);
+    }
+    // printf("[CANMV]: exit sensor_reset\r\n");
+    return 0;
+
+}
+
+/**
+ * @brief  
+ * @note   
+ * @param  *sensor: 
+ * @param  *image: 
+ * @retval 
+ */
+*/
+int sensor_snapshot(sensor_t *sensor, image_t *image)
+{
+    if (!sensor->reset_set || !sensor->size_set)
+        return -2;
+    if (image == NULL)
+        return -1;
+
+    // Make sure the raw frame fits into the FB. If it doesn't it will be cropped if
+    // the format is set to GS, otherwise the pixel format will be swicthed to BAYER.
+    sensor_check_buffsize();// 
+
+    // The user may have changed the MAIN_FB width or height on the last image so we need
+    // to restore that here. We don't have to restore bpp because that's taken care of
+    // already in the code below. Note that we do the JPEG compression above first to save
+    // the FB of whatever the user set it to and now we restore.
+    MAIN_FB()->w = MAIN_FB()->u;
+    MAIN_FB()->h = MAIN_FB()->v;
+
+
+        // Fix the BPP
+        MAIN_FB()->bpp = 2;
+
+#if CONFIG_MAIXPY_OMV_DOUBLE_BUFF
+        if (sensor->double_buff)
+        {
+            if (g_sensor_buff_index_out != g_sensor_buff_index_in)
+            {
+                g_sensor_buff_index_out = (g_sensor_buff_index_out + 1) % SENSOR_BUFFER_NUM;
+                if ((g_sensor_buff_index_out == g_sensor_buff_index_in) && buff_ready)
+                {
+                    g_sensor_buff_index_in = (g_sensor_buff_index_in + 1) % SENSOR_BUFFER_NUM;
+                    buff_ready = false;
+                }
+            }
+            else
+            {
+            }
+            // printk("out--:%d %d %d\r\n", g_sensor_buff_index_out, g_sensor_buff_index_in, buff_ready);
+            //wait for new frame
+            uint32_t start = systick_current_millis();
+            while ((g_sensor_buff_index_in == g_sensor_buff_index_out) && (!buff_ready)) // rempty
+            {
+                _ndelay(50);
+                if (systick_current_millis() - start > 300) //wait for 30ms
+                    return -1;
+            }
+            // Set the user image.
+            image->w = MAIN_FB()->w;
+            image->h = MAIN_FB()->h;
+            image->bpp = MAIN_FB()->bpp;
+            image->pix_ai = MAIN_FB()->pix_ai[g_sensor_buff_index_out];
+            image->pixels = MAIN_FB()->pixels[g_sensor_buff_index_out];
+        }
+        else
+        {
+            //wait for new frame
+            g_dvp_finish_flag = 0;
+            uint32_t start = systick_current_millis();
+            while (g_dvp_finish_flag == 0)
+            {
+                _ndelay(50);
+                if (systick_current_millis() - start > 300) //wait for 30ms
+                    return -1;
+            }
+            // Set the user image.
+            image->w = MAIN_FB()->w;
+            image->h = MAIN_FB()->h;
+            image->bpp = MAIN_FB()->bpp;
+            image->pix_ai = MAIN_FB()->pix_ai[0];
+            image->pixels = MAIN_FB()->pixels[0];
+        }
+#else
+        //wait for new frame
+        g_dvp_finish_flag = 0;
+        uint32_t start = systick_current_millis();
+        while (g_dvp_finish_flag == 0)
+        {
+            _ndelay(50);
+            if (systick_current_millis() - start > 300) //wait for 30ms
+                return -1;
+        }
+        // Set the user image.
+        image->w = MAIN_FB()->w;
+        image->h = MAIN_FB()->h;
+        image->bpp = MAIN_FB()->bpp;
+        image->pix_ai = MAIN_FB()->pix_ai;
+        image->pixels = MAIN_FB()->pixels;
+#endif
+        //as data come in is in u32 LE format, we need exchange its order
+        //unsigned long t0,t1;
+        //t0=read_cycle();
+        //exchang_data_byte((image->pixels), (MAIN_FB()->w)*(MAIN_FB()->h)*2);
+        //exchang_pixel((image->pixels), (MAIN_FB()->w)*(MAIN_FB()->h)); //cost 3ms@400M
+
+        if (sensor->pixformat == PIXFORMAT_GRAYSCALE)
+        {
+            image->pixels = image->pix_ai;
+        }
+        else
+        {
+            reverse_u32pixel((uint32_t *)(image->pixels), (MAIN_FB()->w) * (MAIN_FB()->h) / 2);
+        }
+
+        //t1=read_cycle();
+        //printf("%ld-%ld=%ld, %ld us!\r\n",t1,t0,(t1-t0),((t1-t0)*1000000/400000000));
+
+    return 0;
+}

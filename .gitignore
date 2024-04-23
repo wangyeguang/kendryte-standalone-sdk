@@ -24,7 +24,7 @@
 
 # Libraries
 *.lib
-*.a
+# *.a
 *.la
 *.lo
 
@@ -37,7 +37,7 @@
 # Executables
 *.exe
 *.out
-*.app
+# *.app
 *.i*86
 *.x86_64
 *.hex
@@ -811,7 +811,9 @@ kendryte-standlone-sdk.si4project/
 
 kendryte-standalone-demo
 kendryte-standalone-demo-bak
-src/
+# src/
+src/camera_lcd
+src/face_detect
 !src/hello_world
 /CMakeSettings.json
 /build_i

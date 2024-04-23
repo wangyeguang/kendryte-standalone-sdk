@@ -1,0 +1,30 @@
+{
+  "version": "0.1.0",
+  "files": [
+    {
+      "address": 0x00200000,
+      "bin": "uint8_face_detect_v1_old_e.kmodel",
+      "sha256Prefix": false
+    },
+	{
+      "address": 0x00400000,
+      "bin": "key_point_e.kmodel",
+      "sha256Prefix": false
+    },
+	{
+      "address": 0x00600000,
+      "bin": "feature_extraction_e.kmodel",
+      "sha256Prefix": false
+    },
+	{
+      "address": 0x00800000,
+      "bin": "fc_e.bin",
+      "sha256Prefix": false
+    },
+	{
+      "address": 0x00a00000,
+      "bin": "face_alive_e.kmodel",
+      "sha256Prefix": false
+    }	
+  ]
+}

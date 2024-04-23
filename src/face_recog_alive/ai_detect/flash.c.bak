@@ -1,0 +1,45 @@
+#include "w25qxx.h"
+#include "flash.h"
+#include <iomem.h>
+#include <stdlib.h>
+#include <otp.h>
+#include <printf.h>
+//从flash中读取配置
+void read_config_from_flash(config_data_t* config)
+{
+    //读取配置
+    //...
+}
+//配置信息保存到flash中
+void save_config_to_flash(config_data_t* config)
+{
+
+}
+
+bool flash_init(void)
+{
+    /* spi flash init */
+    // w25qxx_init(3, 0, 60000000);
+    uint8_t manuf_id, device_id;
+    w25qxx_init_dma(3, 0);
+    w25qxx_enable_quad_mode_dma();
+    w25qxx_read_id_dma(&manuf_id,&device_id);
+    printf("manuf_id:0x%x, device_id:0x%x\n", manuf_id, device_id);
+  return true;
+}
+//以下两个函数操作应加锁
+int flash_read(uint32_t addr,uint32_t size, uint8_t *buf)
+{
+        w25qxx_status_t res = w25qxx_read_data_dma(addr, buf, size,W25QXX_QUAD_FAST);
+        // if(res != W25QXX_OK)
+        // {
+        //     return res;
+        // }
+        return res;
+}
+
+int flash_write(uint32_t addr,uint32_t size, uint8_t *buf)
+{
+    w25qxx_status_t res = w25qxx_write_data_dma(addr, buf,size);
+    return res;
+}

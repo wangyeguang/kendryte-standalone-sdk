@@ -3,7 +3,7 @@
 
 #include <stdint.h>
 #include "kpu.h"
-
+#define MAX_FOUND_FACES 5
 typedef struct
 {
     uint32_t obj_number;
@@ -15,7 +15,7 @@ typedef struct
         uint32_t y2;
         uint32_t class_id;
         float prob;
-    } obj[10];
+    } obj[MAX_FOUND_FACES];
 } obj_info_t;
 
 typedef struct
