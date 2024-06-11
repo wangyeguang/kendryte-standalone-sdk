@@ -23,12 +23,16 @@ header_directories(${SDK_ROOT}/lib)
 header_directories(src/${PROJ})
 header_directories(src/${PROJ}/include)
 header_directories(src/${PROJ}/ai)
+# header_directories(src/${PROJ}/utils/base64/include)
+header_directories(src/${PROJ}/utils/cJSON/include)
+# header_directories(src/${PROJ}/utils/jpeg_decode/include)
+# header_directories(src/${PROJ}/utils/jpeg_encode/include)
 # header_directories(src/${PROJ})
 # header_directories(kendryte-standalone-demo/${PROJ})
 
-add_subdirectory(third_party/gsl-lite)
-add_subdirectory(third_party/mpark-variant)
-add_subdirectory(third_party/nlohmann_json)
+# add_subdirectory(third_party/gsl-lite)
+# add_subdirectory(third_party/mpark-variant)
+# add_subdirectory(third_party/nlohmann_json)
 # build library first
 add_subdirectory(lib)
 
@@ -36,11 +40,8 @@ add_subdirectory(lib)
 # add_definitions(-DCONFIG_LOG_ENABLE=1)
 # add_definitions(-DCONFIG_LOG_LEVEL=LOG_DEBUG)
 # compile project
+# add_source_files(src/${PROJ}/*.c src/${PROJ}/*.s src/${PROJ}/*.S src/${PROJ}/*.cpp src/${PROJ}/ai/*.c src/${PROJ}/utils/base64/*.c src/${PROJ}/utils/cJSON/*.c src/${PROJ}/utils/jpeg_decode/*.c src/${PROJ}/utils/jpeg_encode/*.c)
 add_source_files(src/${PROJ}/*.c src/${PROJ}/*.s src/${PROJ}/*.S src/${PROJ}/*.cpp src/${PROJ}/ai/*.c)
-# add_source_files(${PROJ}/src/*.c ${PROJ}/src/*.cpp ${PROJ}/src/*.s ${PROJ}/src/*.S ${PROJ}/ai/*.c)
-# add_source_files(kendryte-standalone-demo/${PROJ}/*.c kendryte-standalone-demo/${PROJ}/*.s kendryte-standalone-demo/${PROJ}/*.S kendryte-standalone-demo/${PROJ}/*.cpp)
-# add_executable(app ${PROJ}/src/*.c ${PROJ}/src/*.cpp ${PROJ}/src/*.s ${PROJ}/src/*.S ${PROJ}/ai/*.c)
-
 # 
 include(./cmake/executable.cmake)
 # file(TO_CMAKE_PATH "${PROJ}/ai/libai.a" LIBAI_PATH)

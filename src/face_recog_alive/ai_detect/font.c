@@ -554,6 +554,7 @@ static uint8_t ascii[] = {
 		0x00,0x00,0x00,0x00,0x24,0x54,0x48,0x00,0x00,0x00,0x00,0x00,
 };
 
+
 struct font
 {
   /* data */
@@ -617,7 +618,13 @@ void font_load(uint8_t index, uint8_t width, uint8_t high, uint8_t source_type, 
     }
 }
 
+/**
+ * @brief 获取UTF-8字符的字节长度
+ * @param pInput 输入的UTF-8字符
+ * @return 字节长度
+ */
 int font_get_utf8_size(const uint8_t pInput)
+
 {
    uint8_t c = pInput;
    // 0xxxxxxx 1

@@ -1,0 +1,32 @@
+
+menu "utils config"
+    
+    menu "list config"
+        config LIST_MAX_NUM
+            int "list max num"
+            default 1
+        config LIST_NODE_MAX_NUM
+            int "list node num"
+            default 32
+        config LIST_ITERATOR_MAX_NUM
+            int "list iterator num"
+            default 2
+    endmenu
+    
+    config  ENABLE_CQUEUE
+        bool "enable cqueue module"
+        default n
+
+    config ENABLE_JPEG_DECODE
+        bool "enable jpeg decode"
+        default y
+
+    config ENABLE_JPEG_ENCODE
+        bool "enable jpeg encode"
+        default y
+
+    # sd_card
+    osource "${SDK_PATH}/components/utils/qrcode/Kconfig"
+
+endmenu
+

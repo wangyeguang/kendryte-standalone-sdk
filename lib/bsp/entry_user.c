@@ -76,8 +76,10 @@ void _init_bsp(int core_id, int number_of_cores)
         /* Initialize bss data to 0 */
         init_bss();
         /* Init UART */
-        fpioa_set_function(4, FUNC_UART3_RX);
-        fpioa_set_function(5, FUNC_UART3_TX);
+        // fpioa_set_function(4, FUNC_UART3_RX);
+        // fpioa_set_function(5, FUNC_UART3_TX);
+        fpioa_set_function(30, FUNC_UART3_RX);
+        fpioa_set_function(31, FUNC_UART3_TX);
         uart_debug_init(UART_DEVICE_3);
         dmac_init();
         /* Init FPIOA */

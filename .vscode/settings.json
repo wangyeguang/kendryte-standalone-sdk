@@ -54,6 +54,22 @@
         "xlocnum": "cpp",
         "xmemory": "cpp",
         "xstddef": "cpp",
-        "xtr1common": "cpp"
-    }
+        "xtr1common": "cpp",
+        "face_info.h": "c",
+        "sha256.h": "c",
+        "device_config.h": "c",
+        "font.h": "c",
+        "rtc_time.h": "c",
+        "sipeed_i2c.h": "c",
+        "rtc.h": "c",
+        "string_view": "c",
+        "base64.h": "c",
+        "string": "c"
+    },
+    "cody.autocomplete.experimental.ollamaOptions": {
+        "url": "http://192.168.0.140:14434",
+        "model": "codellama"
+    },
+    "Codegeex.CompletionModel": "CodeGeeX Lite",
+    "Codegeex.OnlyKeyControl": true
 }

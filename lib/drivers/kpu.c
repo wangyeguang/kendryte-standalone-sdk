@@ -1370,7 +1370,7 @@ int kpu_load_kmodel(kpu_model_context_t *ctx, const uint8_t *buffer)
     const kpu_kmodel_header_t *header = (const kpu_kmodel_header_t *)buffer;
     printf("[kpu_load_kmodel]: header->version: %d header->arch:%d layers_length:%d output_count:%d\n",
     header->version,header->arch,header->layers_length,header->output_count);
-    printf("[kpu_load_kmodel]: ctx->is_nncase:%d version:%d\n",ctx->is_nncase,ctx->nncase_version);
+    printf("[kpu_load_kmodel]: ctx->is_nncase:%d\n",ctx->is_nncase);
     if(header->version == 3 && header->arch == 0)
     {
         ctx->is_nncase = 0;

@@ -1,9 +1,9 @@
 /*
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-02 16:23:22
- * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-04-19 13:41:55
- * @FilePath: \kendryte-standalone-sdk\src\face_recog_alive\ai_detect\lcd.c
+ * @LastEditors: Wangyg wangyeguang521@163.com
+ * @LastEditTime: 2024-06-06 17:56:33
+ * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\lcd.c
  * @Description: 
  * 
  * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
@@ -19,7 +19,11 @@
 #include <unistd.h>
 #include "sleep.h"
 #include "font.h"
+#include "w25qxx.h"
+#include "device_config.h"
 
+#define LCD_SWAP_COLOR_BYTES 1
+#define SWAP_16(x) ((x >> 8 & 0xff) | (x << 8))
 static uint16_t width_curr = 0;
 static uint16_t height_curr = 0;
 
@@ -43,6 +47,8 @@ static uint16_t g_lcd_w = 0;
 static uint16_t g_lcd_h = 0;
 static bool g_lcd_init = false;
 static mcu_lcd_ctl_t lcd_ctl;
+
+uint8_t lcd_dis_get_zhCN_dat(uint8_t *zhCN_char, uint8_t *zhCN_dat);
 
 void lcd_set_direction(lcd_dir_t dir)
 {
@@ -71,7 +77,7 @@ void lcd_set_direction(lcd_dir_t dir)
 }
 
 
-static void lcd_set_area(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
+void lcd_set_area(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 {
     uint8_t data[4] = {0};
 
@@ -100,7 +106,8 @@ static void lcd_set_area(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2)
 int lcd_init(void)
 {
     int ret = 0;
-    uint16_t color = BLUE;
+    // uint16_t color = MARINE_BLUE;
+    uint16_t color = BLACK;//默认背景黑色
     fpioa_set_function(37, FUNC_GPIOHS0 + RST_GPIONUM); //RST_PIN
     fpioa_set_function(38, FUNC_GPIOHS0 + DCX_GPIONUM);//DCX_PIN
     fpioa_set_function(36, FUNC_SPI0_SS0 + LCD_SPI_SLAVE_SELECT);//CS_PIN
@@ -108,7 +115,7 @@ int lcd_init(void)
 
     //lcd init
     uint8_t data = 0;
-    lcd_ctl.dir =DIR_YX_RLDU;//DIR_XY_RLUD;//竖屏  //DIR_YX_RLDU横屏
+    lcd_ctl.dir =DIR_YX_RLDU;//DIR_XY_RLUD;//竖屏  //DIR_YX_RLDU�?�?
     lcd_ctl.width = 320;
     lcd_ctl.height = 240;
     lcd_ctl.start_offset_w0 =0;
@@ -234,35 +241,146 @@ void lcd_draw_point(uint16_t x, uint16_t y, uint16_t color)
     lcd_set_area(x, y, x, y);
     tft_write_byte((uint8_t*)&color, 2);
 }
-static void lcd_draw_char(uint16_t x, uint16_t y, char c, uint16_t color)
+
+/**
+ * @brief draw char on the LCD screen
+ *
+ * @param x x coordinate of the start point in pixels.
+ * @param y y coordinate of the start point in pixels.
+ * @param c character to display.
+ * @param color color index for the character.
+ */
+static void lcd_draw_char(uint16_t x, uint16_t y, uint8_t c, uint16_t color,uint16_t back_color)
 {
     uint8_t i = 0;
+    /* ������������ڴ洢�ַ������� */
     uint8_t j = 0;
     uint8_t data = 0;
 
     for (i = 0; i < 16; i++)
+    /* �� ASCII ���ж�ȡ�ַ������ݣ�������洢�� data ������ */
     {
         data = ascii0816[c * 16 + i];
+        /* ��ȡ ASCII ���е��ַ����� */
         for (j = 0; j < 8; j++)
         {
             if (data & 0x80)
+            /* ������ݵ����λ�Ƿ�Ϊ 1�����������Ƶ� */
                 lcd_draw_point(x + j, y, color);
+            else
+            {
+                lcd_draw_point(x + j, y, back_color);
+            }
+            /* �����ݵ����λ����һ�� bit���Ա���������һ���ַ� */
             data <<= 1;
         }
         y++;
     }
 }
 
-void lcd_draw_string(uint16_t x, uint16_t y, char *str, uint16_t color)
+
+static void lcd_draw_zh_char(uint8_t *zhCh_char,uint16_t x, uint16_t y,  uint16_t color)
 {
-        #if LCD_SWAP_COLOR_BYTES
-        color = SWAP_16(color);
-    #endif
-        while (*str)
+    uint8_t zhCN_dat[128]; //max 16*16
+    memset(zhCN_dat,0xff,sizeof(zhCN_dat));
+
+    lcd_dis_get_zhCN_dat(zhCh_char,zhCN_dat);
+    
+    // printf("zh_char:%x %x:",*zhCh_char,*(zhCh_char+1));
+    // for(int i=1;i<=2;i++)
+    // {
+    //     for(int j=0;j<16;j++)
+    //         printf(" %x",zhCN_dat[i*j]);
+    //     printf("\n");
+    // }
+    
+     uint8_t data;
+    uint16_t *addr = NULL;
+    uint16_t oy = y;
+    for(uint8_t i=0;i<32;i++)
     {
-        lcd_draw_char(x, y, *str, color);
-        str++;
-        x += 8;
+        data = *(zhCN_dat+i);
+        for(uint8_t j=0;j<8;j++)
+        {
+            // addr = y*240+x;
+            if(data & 0x80)
+            {
+                lcd_draw_point(x, y, color);
+            }
+            data <<= 1;
+            y++;
+            if((y-oy)== 16)
+            {
+                y=oy;
+                x++;
+                break;
+            }
+        }
+    }
+}
+void lcd_draw_string(uint16_t x, uint16_t y, uint8_t *str, uint16_t color,uint16_t back_color)
+{
+#if LCD_SWAP_COLOR_BYTES
+    color = SWAP_16(color);
+#endif
+     uint8_t have_zhCN = 0;
+    uint16_t ox = x;
+    uint16_t oy = y;
+    uint8_t size = 16;
+    while (*str)
+    {
+        //�ж��Ƿ�Ϊ���ģ�������������ȡgb2312λ�룬����������ֱ����ʾ
+        if(have_zhCN == 0)
+        {
+            if(*str > 0x80)
+            {
+                have_zhCN = 1; // ���Ϊ���ڴ��������ַ�
+            }
+            else
+            {
+                // if (x > (ox + 240 - size / 2)) // �������ͼ�����
+                // {
+                //     y += size; // ����
+                //     x = ox; // ����x����
+                // }
+                if (y > (oy + 320 - size)) // �������ͼ��߶�
+                    break; // �˳�ѭ��
+
+                if ((*str == 0xd) || // ����ǻس������з�
+                    (*str == 0xa))
+                {
+                    y += size; // ����
+                    x = ox; // ����x����
+                    str++; // �ƶ�����һ���ַ�
+                }
+                else
+                {
+                    
+                    lcd_draw_char(x, y, *str, color,back_color);//��ʾӢ���ַ�
+                }
+                str++;          // �ƶ�����һ���ַ�
+                x+= 8;  // ����x����
+            }
+            
+        }
+        else
+        {
+            have_zhCN = 0; // ���ñ��
+            // if (x > (ox + img_w - size)) // �������ͼ�����
+            // {
+            //     y += size; // ����
+            //     x = ox; // ����x����
+            // }
+            if (y > (oy + 320 - size)) // �������ͼ��߶�
+                break; // �˳�ѭ��
+            
+            lcd_draw_zh_char(str,x,y,color);
+            str += 2; // �ƶ�����һ���ַ��������ַ�ռ�����ֽڣ�
+            x += size; // ����x����
+        }
+        
+        // str++;
+        // x += 8;
     }
 }
 static void ram_draw_char(uint32_t *ptr, uint16_t x, uint16_t y, char c, uint16_t color)
@@ -289,14 +407,74 @@ static void ram_draw_char(uint32_t *ptr, uint16_t x, uint16_t y, char c, uint16_
         y++;
     }
 }
+static void ram_draw_zh_char(uint32_t *ptr,uint16_t x, uint16_t y, uint8_t  *zhCh_char, uint16_t color)
+{
+    uint8_t zhCN_dat[128]; //max 16*16
+    memset(zhCN_dat,0xff,sizeof(zhCN_dat));
 
+    lcd_dis_get_zhCN_dat(zhCh_char,zhCN_dat);
+        printf("zh_char:%x %x:",*zhCh_char,*(zhCh_char+1));
+    for(int i=1;i<=2;i++)
+    {
+        for(int j=0;j<16;j++)
+            printf(" %x",zhCN_dat[i*j]);
+        printf("\n");
+    }
+    uint8_t data;
+    uint16_t *addr = NULL;
+    uint16_t oy = y;
+    for(uint8_t i=0;i<32;i++)
+    {
+        data = *(zhCN_dat+i);
+        addr = ((uint16_t *)ptr) + y * (lcd_ctl.width + 1) + x;
+        for(uint8_t j=0;j<8;j++)
+        {
+            if(data & 0x80)
+            {
+                if((x + j) & 1)
+                    *(addr - 1) = color;
+                else
+                    *(addr + 1) = color;
+            }
+            data <<= 1;
+            addr++;
+            y++;
+            if((y-oy)== 16)
+            {
+                y=oy;
+                x++;
+                break;
+            }
+        }
+    }
+}
 void ram_draw_string(uint32_t *ptr, uint16_t x, uint16_t y, char *str, uint16_t color)
 {
+    uint8_t have_zhCN = 0;
+    
     while(*str)
     {
-        ram_draw_char(ptr, x, y, *str, color);
-        str++;
-        x += 8;
+        if(have_zhCN == 0)
+        {
+            if(*str > 0x80)
+            {
+                have_zhCN = 1;
+            }
+            else
+            {
+                ram_draw_char(ptr, x, y, *str, color);
+                str++;
+                x += 8;
+            }
+        }
+        else
+        {
+            have_zhCN = 0; 
+            ram_draw_zh_char(ptr,x,y,str,color);
+            str+=2;
+            x+= 16; 
+        }
+
     }
 }
 static uint16_t* g_pixs_draw_pic = NULL;
@@ -413,4 +591,30 @@ void lcd_set_rotation(uint8_t rotate)
     }
     lcd_set_direction(dir);
 }
-// extern void imlib_draw_ascii_string(image_t *img, int x_off, int y_off, const char *str, int c, float scale, int x_spacing, int y_spacing, bool mono_space);
+//GB2312 //ȡģ��ʽ�� ���룬����ʽ��˳��
+uint8_t lcd_dis_get_zhCN_dat(uint8_t *zhCN_char, uint8_t *zhCN_dat)
+{
+    uint8_t ch, cl;
+    uint32_t font_offset;
+
+    // uint8_t csize = (size / 8 + ((size % 8) ? 1 : 0)) * (size);  
+    uint8_t csize = 32;
+
+    ch = *zhCN_char;
+    cl = *(++zhCN_char);
+
+    if (ch < 0xa1 || cl < 0xa0 ||
+        ch > 0xf7 ||
+        (ch >= 0xaa && ch <= 0xaf))
+    {
+        return 0;
+    }
+
+    ch -= 0xa1;
+    cl -= 0xa0;
+
+    font_offset = (ch * 96 + cl) * csize;
+    w25qxx_read_data((uint32_t)(FONT_DATA_ADDR + font_offset), zhCN_dat, csize, W25QXX_QUAD_FAST);
+    
+    return 1;
+}
