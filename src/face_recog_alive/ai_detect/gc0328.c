@@ -898,7 +898,7 @@ static const uint8_t qvga_config[][2] = { //k210
 
 int sccb_i2c_write_byte( uint8_t addr, uint16_t reg, uint8_t reg_len, uint8_t data, uint16_t timeout_ms)
 {
-        uint8_t tmp[3];
+        uint8_t tmp[3]={0};
         if (reg_len == 8)
         {
             tmp[0] = reg & 0xFF;

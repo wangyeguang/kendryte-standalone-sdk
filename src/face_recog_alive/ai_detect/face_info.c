@@ -2,7 +2,7 @@
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-23 11:20:21
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-05 19:35:26
+ * @LastEditTime: 2024-06-27 22:00:07
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\face_info.c
  * @Description: 
  * 
@@ -18,9 +18,14 @@
 #include "util.h"
 
 volatile LOCK_IN_SECTION(DATA) face_save_info_t g_face_save_info;
-volatile static LOCK_IN_SECTION(DATA) uint32_t uid_table[FACE_DATA_MAX_COUNT];
+volatile static LOCK_IN_SECTION(DATA) uint32_t uid_table[FACE_DATA_MAX_COUNT];  //人脸ID列表
 
 /*face info function*/
+/**
+ * @brief  获取未被设置的faceid
+ * @note   
+ * @retval 
+ */
 static int get_face_id(void)
 {
     int ret = -1;
@@ -41,6 +46,13 @@ static int get_face_id(void)
     }
     return ret;
 }
+
+/**
+ * @brief  初始化人脸ID列表
+ * @note   
+ * @param  init_flag: 
+ * @retval None
+ */
 static void flash_init_uid_table(uint8_t init_flag)
 {
     int i;
@@ -82,6 +94,12 @@ uint32_t flash_get_id_by_uid(uint32_t uid)
     }
     return 0;
 }
+/**
+ * @brief  删除指定ID人脸数据
+ * @note   
+ * @param  id: 
+ * @retval 
+ */
 int flash_delete_face_info(uint32_t id)
 {
     if (g_face_save_info.number == 0)
@@ -96,6 +114,11 @@ int flash_delete_face_info(uint32_t id)
     uid_table[id]=0;
     return 0;
 }
+/**
+ * @brief  删除所有人脸数据
+ * @note   
+ * @retval 
+ */
 
 int flash_delete_face_all(void)
 {
@@ -107,7 +130,16 @@ int flash_delete_face_all(void)
 }
 
 
-// int flash_save_face_info(face_fea_t *features, uint8_t *uid, uint32_t valid, char *name, char *note, uint8_t *ret_uid)
+/**
+ * @brief  保存人脸特征值
+ * @note   
+ * @param  *features: 
+ * @param  uid: 
+ * @param  valid: 
+ * @param  *name: 
+ * @param  *ret_uid: 
+ * @retval 
+ */
 int flash_save_face_info(face_fea_t *features, uint32_t uid, uint32_t valid, char *name, uint32_t *ret_uid)
 {
     face_info_t v_face_info;
@@ -160,12 +192,26 @@ int flash_save_face_info(face_fea_t *features, uint32_t uid, uint32_t valid, cha
     return 0;
 }
 
+/**
+ * @brief  更新人脸特征值
+ * @note   
+ * @param  *face_info: 
+ * @retval 
+ */
 int flash_update_face_info(face_info_t *face_info)
 {
     w25qxx_write_data(FACE_FEATURE_ADDR + face_info->index * (sizeof(face_info_t)), (uint8_t *)face_info, sizeof(face_info_t));
     return 0;
 }
 
+/**
+ * @brief  获取指定index人脸特征值及ID
+ * @note   
+ * @param  index: 
+ * @param  *uid: 
+ * @param  *feature: 
+ * @retval 
+ */
 int flash_get_saved_uid_feature(uint32_t index, uint32_t *uid, face_fea_t *feature)
 {
     uint32_t i;
@@ -310,10 +356,24 @@ int flash_get_saved_faceinfo(face_info_t *info, uint32_t index)
     }
     return (i < FACE_DATA_MAX_COUNT) ? 0 : -1;
 }
+
+/**
+ * @brief  获取存储的人脸特征数量
+ * @note   
+ * @retval 
+ */
 int flash_get_saved_feature_number(void)
 {
     return g_face_save_info.number;
 }
+
+/**
+ * @brief  获取指定ID人员信息
+ * @note   
+ * @param  *face_info: 
+ * @param  id: 
+ * @retval 
+ */
 int flash_get_face_info(face_info_t *face_info, uint32_t id)
 {
     uint32_t image_address = FACE_FEATURE_ADDR + id * (sizeof(face_info_t));
@@ -325,6 +385,13 @@ int flash_get_face_info(face_info_t *face_info, uint32_t id)
     }
     return 0;
 }
+/**
+ * @brief  获取指定index人脸特征值
+ * @note   index对应人脸特征值列表下标及人脸信息列表下标
+ * @param  *feature: 
+ * @param  index: 
+ * @retval 
+ */
 int flash_get_saved_feature(face_fea_t *feature, uint32_t index)
 {
     uint32_t i;
@@ -347,6 +414,68 @@ int flash_get_saved_feature(face_fea_t *feature, uint32_t index)
         }
     }
     return 0;
+}
+/**
+ * @brief  加载人脸信息
+ * @note   
+ * @retval None
+ */
+void flash_load_face_info(void)
+{
+    w25qxx_read_data(FACE_ADDR,(uint8_t *)&g_face_save_info,sizeof(g_face_save_info),W25QXX_QUAD_FAST);
+    if(g_face_save_info.header == FACE_HEADER)
+    {
+        printf("The header ok\r\n");
+        uint32_t v_num = g_face_save_info.number;
+        printf("there is %d img\r\n",v_num);
+        v_num = 0;
+
+        for(uint32_t i=0;i<FACE_DATA_MAX_COUNT;i++)
+        {
+            if(g_face_save_info.face_info_index[i/32]>>(i%32)&0x01)
+            {
+                v_num++;
+            }
+        }
+         if (v_num != g_face_save_info.number)
+        {
+            printf("err:> index is %d, but saved is %d\r\n", v_num, g_face_save_info.number);
+            g_face_save_info.number = v_num;
+        }
+
+        if (v_num >= FACE_DATA_MAX_COUNT)
+        {
+            printf("ERR, too many pic\r\n");
+        }
+
+        flash_init_uid_table(0);
+    }
+    else
+    {
+        printf("No header\r\n");
+        g_face_save_info.header = FACE_HEADER;
+        g_face_save_info.number = 0;
+        memset((void *)g_face_save_info.face_info_index, 0, sizeof(g_face_save_info.face_info_index));
+        w25qxx_write_data(FACE_ADDR, (uint8_t *)&g_face_save_info, sizeof(face_save_info_t));
+
+        flash_init_uid_table(1);
+    }
+}
+void flash_get_face_feature(float *reg_feature)
+{
+    face_info_t face_info;
+    int ret=0;
+    memset(reg_feature,0,(FACE_DATA_MAX_COUNT*FEATURE_LEN));
+    for(int i=0;i<FACE_DATA_MAX_COUNT;i++)
+    {
+        // memset(&face_info,0,sizeof(face_info_t));
+         if ((g_face_save_info.face_info_index[i / 32] >> (i % 32)) & 0x1)
+         {
+            flash_get_face_info(&face_info, i);
+            memcpy(reg_feature+i*FEATURE_LEN,face_info.info.fea_rgb,FEATURE_LEN);
+         }
+    }
+    
 }
 /*device config function*/
 uint8_t flash_load_cfg(board_cfg_t *cfg)
@@ -381,6 +510,12 @@ uint8_t flash_load_cfg(board_cfg_t *cfg)
 
     return 0;
 }
+/**
+ * @brief  保存配置文件
+ * @note   
+ * @param  *cfg: 
+ * @retval 
+ */
 uint8_t flash_save_cfg(board_cfg_t *cfg)
 {
     w25qxx_status_t stat;
@@ -389,7 +524,7 @@ uint8_t flash_save_cfg(board_cfg_t *cfg)
 
     sha256_hard_calculate((uint8_t *)cfg + 32, sizeof(board_cfg_t) - 32, cfg->cfg_sha256);
 
-    printf("boardcfg checksum:");
+    printf("[ flash_save_cfg ] boardcfg checksum:");
     for (uint8_t i = 0; i < 32; i++)
     {
         printf("%02X", cfg->cfg_sha256[i]);

@@ -1,8 +1,8 @@
 /*
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-23 11:26:51
- * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-05-08 19:15:59
+ * @LastEditors: Wangyg wangyeguang521@163.com
+ * @LastEditTime: 2024-06-26 13:21:05
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\lcd.h
  * @Description: 
  * 
@@ -82,7 +82,7 @@ void lcd_draw_string(uint16_t x, uint16_t y, uint8_t *str, uint16_t color,uint16
 void lcd_draw_picture(uint16_t x1, uint16_t y1, uint16_t width, uint16_t height, uint8_t *ptr);
 void lcd_draw_rectangle(uint16_t x1, uint16_t y1, uint16_t x2, uint16_t y2, uint16_t width, uint16_t color);
 void lcd_ram_draw_string(char *str, uint32_t *ptr, uint16_t font_color, uint16_t bg_color);
-void ram_draw_string(uint32_t *ptr, uint16_t x, uint16_t y, char *str, uint16_t color);
-void lcd_set_rotation(uint8_t rotate);
+void ram_draw_string(uint32_t *ptr, uint16_t x, uint16_t y, uint8_t *str, uint16_t color);
+void lcd_set_rotation(char rotate);
 #endif
 

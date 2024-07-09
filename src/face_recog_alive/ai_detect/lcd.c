@@ -2,7 +2,7 @@
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-02 16:23:22
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-06 17:56:33
+ * @LastEditTime: 2024-06-26 19:06:15
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\lcd.c
  * @Description: 
  * 
@@ -448,7 +448,7 @@ static void ram_draw_zh_char(uint32_t *ptr,uint16_t x, uint16_t y, uint8_t  *zhC
         }
     }
 }
-void ram_draw_string(uint32_t *ptr, uint16_t x, uint16_t y, char *str, uint16_t color)
+void ram_draw_string(uint32_t *ptr, uint16_t x, uint16_t y, uint8_t *str, uint16_t color)
 {
     uint8_t have_zhCN = 0;
     
@@ -551,7 +551,7 @@ void lcd_draw_picture(uint16_t x1, uint16_t y1, uint16_t width, uint16_t height,
         tft_write_half(g_lcd_display_buff, 1);
     }
 }
-void lcd_set_rotation(uint8_t rotate)
+void lcd_set_rotation(char rotate)
 {
     
     if (rotate > 3 || rotate < 0)

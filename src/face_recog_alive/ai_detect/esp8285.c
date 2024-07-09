@@ -1,8 +1,18 @@
 /*
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-04-23 11:20:21
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-07-04 07:03:32
+ * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\esp8285.c
+ * @Description: 
+ * 
+ * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+ */
+/*
+ * @Author: Wangyg wangyeguang521@163.com
+ * @Date: 2024-04-23 11:20:21
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-03 19:21:51
+ * @LastEditTime: 2024-06-17 13:55:14
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\esp8285.c
  * @Description: 
  * 
@@ -19,6 +29,9 @@
 #include <gpio.h>
 #include <gpiohs.h>
 #include <spi.h>
+#include "buffer.h"
+#include <stdio.h>
+#include "device_config.h"
 
 #define WIFI_UART_NUM    UART_DEVICE_2
 #define UART_GPIO_TX_PIN   (7)
@@ -32,7 +45,7 @@
 #define WIFI_PIN_SPI_MISO   (2)
 #define WIFI_PIN_SPI_MOSI   (3)
 #define WIFI_PIN_SPI_SCLK   (1)
-#define ESP8285_BUF_SIZE 10240
+#define ESP8285_BUF_SIZE 5120 //10240
 #define time_ms() (unsigned long)(read_cycle()/(sysctl_clock_get_freq(SYSCTL_CLOCK_CPU)/1000))
 #define ESP8285_MAX_ONCE_SEND 2048
 static uint8_t uart_buffer[ESP8285_BUF_SIZE];
@@ -59,37 +72,48 @@ static uint8_t uart_channel_getchar(uart_device_number_t channel, uint8_t *data)
     *data = (uint8_t)(uart[channel]->RBR & 0xff);
     return 1;
 }
+/**
+ * @brief  uart RX IRQ
+ * @note   
+ * @param  *ctx: 
+ * @retval 
+ */
+
 static int wifi_port_recv_cb(void *ctx)
 {
  // static uint8_t last_data = 0;
-    uint8_t tmp;
+    uint8_t read_tmp = 0;
     // int len = 0;
     int read_ret = 0;
-    do
-    {   
-        // 计算下一个读缓冲区头部位置
-        uint16_t next_head = (recv_handle.read_buf_head+1) % recv_handle.read_buf_len;
-         // 当缓冲区未满时，继续读取数据
-        while(next_head != recv_handle.read_buf_tail)
-        {
-            read_ret = uart_channel_getchar(WIFI_UART_NUM, &tmp);
-            if(read_ret == 0)
-                break;
-            recv_handle.read_data[recv_handle.read_buf_head] = tmp;
-            recv_handle.read_buf_head = next_head;
-            recv_handle.data_len++;
-            next_head = (recv_handle.read_buf_head+1) % recv_handle.read_buf_len;
-        }
-        // 如果缓冲区已满，继续读取并丢弃数据，直到没有数据可读
-        if(next_head == recv_handle.read_buf_tail)
-        {
-            do{
-                read_ret = uart_channel_getchar(WIFI_UART_NUM,&tmp);
-            }while(read_ret != 0);
-            break; // 当没有更多数据可读时退出循环
-        }
+    if(recv_handle.read_buf_len != 0)
+    {
+        do
+        {   
+            // 计算下一个读缓冲区头部位置
+            uint16_t next_head = (recv_handle.read_buf_head+1) % recv_handle.read_buf_len;
+            // 当缓冲区未满时，继续读取数据
+            while(next_head != recv_handle.read_buf_tail)
+            {
+                read_ret = uart_channel_getchar(WIFI_UART_NUM, &read_tmp);
+                if(read_ret == 0)
+                    break;
+                recv_handle.read_data[recv_handle.read_buf_head] = read_tmp;
+                recv_handle.read_buf_head = next_head;
+                recv_handle.data_len++;//实际接收大小
+                next_head = (recv_handle.read_buf_head+1) % recv_handle.read_buf_len;
+            }
+            // 如果缓冲区已满，继续读取并丢弃数据，直到没有数据可读
+            if(next_head == recv_handle.read_buf_tail)
+            {
+                do{
+                    read_ret = uart_channel_getchar(WIFI_UART_NUM,&read_tmp);
+                }while(read_ret != 0);
+                break; // 当没有更多数据可读时退出循环
+            }
 
-    }while(read_ret!=0);
+        }while(read_ret!=0);
+    }
+    
     return 0;
 }
 static void kmp_get_next(const char* targe, int next[])
@@ -138,7 +162,7 @@ static int kmp_match(char* src,int src_len, const char* targe, int* next)
     else  
         return -1;  
 } 
-static uint32_t kmp_find(char* src,uint32_t src_len, const char* tagert)
+static int kmp_find(char* src,uint32_t src_len, const char* tagert)
 {
 	uint32_t index = 0;
 	uint32_t tag_len = strlen(tagert);
@@ -148,7 +172,7 @@ static uint32_t kmp_find(char* src,uint32_t src_len, const char* tagert)
 	free(next);
 	return index;
 }
-static uint32_t data_find(uint8_t* src,uint32_t src_len, const char* tagert)
+static int data_find(uint8_t* src,uint32_t src_len, const char* tagert)
 {
 	return kmp_find((char*)src,src_len,tagert);
 }
@@ -166,6 +190,13 @@ static int wifi_uart_rx_char(void)
     return -1;
 }
 
+/**
+ * @brief  从串口接收buffer获取数据
+ * @note   
+ * @param  *buf_in: 
+ * @param  size: 
+ * @retval 
+ */
 static int wifi_uart_rx_data(uint8_t *buf_in,uint32_t size)
 {
     uint16_t data_num = 0;
@@ -181,6 +212,11 @@ static int wifi_uart_rx_data(uint8_t *buf_in,uint32_t size)
     }
     return data_num;
 }
+/**
+ * @brief  计算buffer缓存有效数据大小
+ * @note   
+ * @retval 返回实际数据大小
+ */
 static int wifi_uart_rx_any()
 {
     int buffer_bytes = recv_handle.read_buf_head-recv_handle.read_buf_tail;
@@ -195,36 +231,64 @@ static int wifi_uart_rx_any()
     else
         return 0;
 }
+static bool wifi_uart_rx_wait(uint32_t timeout) 
+{
+    uint32_t start = time_ms();
+	// printf("uart_rx_wait | read_buf_head = %d\r\n",recv_handle.read_buf_head);
+	// printf("uart_rx_wait | read_buf_tail = %d\r\n",recv_handle.read_buf_tail);
+    for (;;) {
+        if (recv_handle.read_buf_tail != recv_handle.read_buf_head) {
+            return true; // have at least 1 char ready for reading
+        }
+        if (time_ms() - start >= timeout) {
+            return false; // timeout
+        }
+    }
+}
 int wifi_uart_recvdata(uint8_t *buf,int len)
 {
     int data_num = 0;
-    int ret_num = 0;
-    while(data_num<len)
+    
+    if(wifi_uart_rx_wait(300)) //100ms timeout
     {
-        ret_num = wifi_uart_rx_data(buf+data_num,len-data_num);
-        if(0!=ret_num)
+        int ret_num = 0;   
+        while(data_num<len)
         {
-            data_num+=ret_num;
-        }
-        else if(0==ret_num || !wifi_uart_rx_any())
-        {
-            break;
+            ret_num = wifi_uart_rx_data(buf+data_num,len-data_num);
+            if(0!=ret_num)
+            {
+                data_num+=ret_num;
+            }
+            else if(0==ret_num || !wifi_uart_rx_any())
+            {
+                break;
+            }
+            // msleep(5);
         }
     }
+    
     if(data_num != 0)
     {
         return data_num;
     }
     else
     {
+        // printf("[ wifi_uart_recvdata ] return error\r\n");
         return -1;
     }
 }
-int esp8285_uart_senddata(char *buf,int len)
+int esp8285_uart_senddata(const char *buf,int len)
 {
-    return uart_send_data(WIFI_UART_NUM,buf,len);
+    uint8_t *src = (uint8_t*)buf;
+    size_t num_tx = 0;
+	size_t cal = 0;
+    while (num_tx < len) {
+			cal= uart_send_data(WIFI_UART_NUM, (const char*)(src+num_tx), len - num_tx);
+ 	        num_tx = num_tx + cal;
+	    }
+    return num_tx;
 }
-static void rx_empty(void) 
+void wifi_rx_empty(void) 
 {
     while(1)
     {
@@ -249,7 +313,7 @@ static char* recvString_1(const char* target1,uint32_t timeout,int *recv_len)
         if(recv_buffer == NULL)
         {
                 printf("recvString_1 malloc recv_buf error\n");
-                rx_empty();
+                wifi_rx_empty();
                 return NULL;
         }
     }
@@ -296,7 +360,7 @@ static char* recvString_2(char* target1, char* target2, uint32_t timeout, int8_t
     }
     unsigned int start = time_ms();
     while (time_ms() - start < timeout) {
-        while ((len = wifi_uart_recvdata((char *)(recv_buffer+iter),(max_len-iter))) > 0) {  
+        while ((len = wifi_uart_recvdata((recv_buffer+iter),(max_len-iter))) > 0) {  
             iter += len;
             if(iter >= max_len)
             {
@@ -334,7 +398,7 @@ static char* recvString_3(char* target1, char* target2,char* target3,uint32_t ti
     }
     unsigned long start = time_ms();
     while (time_ms() - start < timeout) {
-        while ((len = wifi_uart_recvdata((char *)(recv_buffer+iter),(max_len - iter))) > 0) {
+        while ((len = wifi_uart_recvdata((recv_buffer+iter),(max_len - iter))) > 0) {
             iter += len;
             if(iter >= max_len)
             {
@@ -363,7 +427,7 @@ static bool recvFind(const char* target, uint32_t timeout)
 {
     int recv_len = 0;
     char *recv_data = recvString_1(target, timeout,&recv_len);
-    if (data_find(recv_data,recv_len,target) != -1) {
+    if (data_find((uint8_t *)recv_data,recv_len,target) != -1) {
         if(recv_data)
             free(recv_data);
         return true;
@@ -377,7 +441,7 @@ static bool recvFindAndFilter(const char* target, const char* begin, const char*
 {
      int recv_len = 0;
     char *recv_data = recvString_1(target, timeout,&recv_len);
-    if (data_find(recv_data,recv_len,target) != -1) {
+    if (data_find((uint8_t *)recv_data,recv_len,target) != -1) {
         free(recv_data);
         int32_t index1 = data_find(recv_data,recv_len,begin);
         int32_t index2 = data_find(recv_data,recv_len,end);
@@ -416,7 +480,7 @@ void get_ip(char *server_ip)
 bool qATCWJAP_CUR()
 {
 	const char* cmd = "AT+CWJAP_CUR?";
-	rx_empty();
+	wifi_rx_empty();
 	esp8285_uart_senddata(cmd,strlen(cmd));
     esp8285_uart_senddata("\r\n",strlen("\r\n"));
 	return recvFind("OK",1000);
@@ -424,7 +488,7 @@ bool qATCWJAP_CUR()
 bool qATCWJAP()
 {
 	const char* cmd = "AT+CWJAP?";
-	rx_empty();
+	wifi_rx_empty();
 	esp8285_uart_senddata(cmd,strlen(cmd));
     esp8285_uart_senddata("\r\n",strlen("\r\n"));
 	return recvFind("OK",1000);
@@ -433,22 +497,22 @@ bool qATCWJAP()
 bool eAT(void)
 {	
 	const char* cmd = "AT\r\n";
-    rx_empty();// clear rx
+    wifi_rx_empty();// clear rx
 	esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     if(recvFind("OK",1000))
         return true;
-    rx_empty();
+    wifi_rx_empty();
     esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     if(recvFind("OK",1000))
         return true;
-    rx_empty();
+    wifi_rx_empty();
     esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     return recvFind("OK",1000);
 }
 
 bool eATE(bool enable)
 {	
-    rx_empty();// clear rx
+    wifi_rx_empty();// clear rx
     if(enable)
     {
     	const char* cmd = "ATE0\r\n";
@@ -471,7 +535,7 @@ bool eATE(bool enable)
 static bool eATRST(void) 
 {
 	const char* cmd = "AT+RST\r\n";
-    rx_empty();// clear rx
+    wifi_rx_empty();// clear rx
     int send_len = esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     printf("[esp8285] send %s",cmd);
     return recvFind("OK",1000);
@@ -480,7 +544,7 @@ static bool eATRST(void)
 static bool eATGMR(char** version)
 {
 	const char* cmd = "AT+GMR\r\n";
-    rx_empty();// clear rx
+    wifi_rx_empty();// clear rx
     esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     return recvFindAndFilter("OK", "\r\n", "\r\nOK", version, 5000); 
 }
@@ -493,7 +557,7 @@ bool qATCWMODE(char* mode)
     if (!mode) {
         return false;
     }
-    rx_empty();
+    wifi_rx_empty();
 	esp8285_uart_senddata((uint8_t*)cmd,strlen(cmd));// send cmd to esp8285
     ret = recvFindAndFilter("OK", "+CWMODE:", "\r\n\r\nOK", &str_mode,1000); 
     if (ret) {
@@ -508,9 +572,9 @@ bool sATCWMODE(char mode)
 	// const char* cmd = "AT+CWMODE=";
 	char cmd[20] = {0};
     int8_t find;
-    rx_empty();
+    wifi_rx_empty();
     snprintf(cmd,20,"AT+CWMODE=%d\r\n",mode);// send cmd to esp8285
-	esp8285_uart_senddata((uint8_t*)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     // msleep(20);
     char *recv_data = recvString_2("OK", "no change",1000, &find);
     if(recv_data != NULL)
@@ -526,9 +590,9 @@ bool sATCWAUTOCONN(int enable)
 {
     char cmd[20]={0};
     int8_t find;
-    rx_empty();
+    wifi_rx_empty();
     snprintf(cmd,20,"AT+CWAUTOCONN=%d\r\n",enable);
-    esp8285_uart_senddata((uint8_t*)cmd,strlen(cmd));// send cmd to esp8285
+    esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     return recvFind("OK",1000);
 }
 /**
@@ -541,7 +605,7 @@ bool eATCIPSTATUS(char** list)
 {
 	const char* cmd = "AT+CIPSTATUS\r\n";
     msleep(100);
-    rx_empty();
+    wifi_rx_empty();
     esp8285_uart_senddata(cmd,strlen(cmd));
     return recvFindAndFilter("OK", "\r\r\n", "\r\n\r\nOK", list,1000);
 }
@@ -556,9 +620,9 @@ bool esp8285_setHostname(const char *hostname)
 {
 	char cmd[50] = {0};
     int8_t find;
-    rx_empty();
+    wifi_rx_empty();
     snprintf(cmd,50,"AT+CWHOSTNAME=\"%s\"\r\n",hostname);// send cmd to esp8285
-	esp8285_uart_senddata((uint8_t*)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     msleep(20);
     return recvFind("OK",1000);
 }
@@ -570,7 +634,7 @@ bool esp8285_setHostname(const char *hostname)
 bool eATCWQAP(void)
 {
 	const char* cmd = "AT+CWQAP\r\n";
-    rx_empty();
+    wifi_rx_empty();
 	esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     return recvFind("OK",1000);
 }
@@ -579,10 +643,10 @@ bool esp8285_joinAP( const char* ssid, const char* pwd)
 {
     char cmd[50]={0};
     int8_t find;
-    rx_empty();	
+    wifi_rx_empty();	
     snprintf(cmd,50,"AT+CWJAP=\"%s\",\"%s\"\r\n",ssid,pwd);// send cmd to esp8285
     printf("[esp8285]: joinAP cmd:%s\n",cmd);
-	esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     char *recv_data = recvString_2("OK", "FAIL", 6000, &find);
     if(recv_data != NULL)
     {
@@ -607,7 +671,7 @@ bool esp8285_JoinState(void)
     return ret;
 }
 
-bool esp8285_sATCIPSTARTSingle(char* addr, uint32_t port)
+bool esp8285_sATCIPSTARTSingle(const char* addr, uint32_t port)
 {
 	// const char* cmd = "AT+CIPSTART=\"";
     char cmd[100]={0};
@@ -616,10 +680,10 @@ bool esp8285_sATCIPSTARTSingle(char* addr, uint32_t port)
 	// char port_str[10] = {0};
     int8_t find_index;
 	// itoa(port, port_str, 10);
-	rx_empty();
+	wifi_rx_empty();
     snprintf(cmd,100,"AT+CIPSTART=\"TCP\",\"%s\",%d\r\n",addr,port);
     printf("[esp8285] send connect tcpserver cmd:%s\n",cmd);
-	esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     char *recv_data=recvString_3("OK", "ERROR", "ALREADY CONNECT", 10000, &find_index);
     if(recv_data!=NULL)
     {
@@ -636,9 +700,9 @@ bool esp8285_sATCIPSTARTMultiple(char mux_id, char* type, char* addr, uint32_t p
     int8_t find_index;
     char cmd[100]={0};
 	// itoa(port,port_str ,10);
-	rx_empty();
+	wifi_rx_empty();
     snprintf(cmd,100,"AT+CIPSTART=%d,\"%s\",\"%s\",%d\r\n",mux_id,type,addr,port);
-	esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     char *recv_data=recvString_3("OK", "ERROR", "ALREADY CONNECT", 10000, &find_index);
     if( recv_data!= NULL)
     {
@@ -653,11 +717,11 @@ bool esp8285_sATCIPSENDSingle(const char* buffer, uint32_t len, uint32_t timeout
 	// const char* cmd = "AT+CIPSEND=";
 	// char len_str[10] = {0};
     char cmd[50]={0};
-	rx_empty();
+	wifi_rx_empty();
     snprintf(cmd,50,"AT+CIPSEND=%d\r\n",len);
-    esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+    esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     if (recvFind(">", 5000)) {
-        rx_empty();
+        wifi_rx_empty();
 		esp8285_uart_senddata(buffer,len);// send cmd to esp8285
         return recvFind("SEND OK", timeout);
     }
@@ -668,12 +732,12 @@ bool esp8285_sATCIPSENDMultiple(char mux_id, const char* buffer, uint32_t len)
 	// const char* cmd = "AT+CIPSEND=";
 	// char len_str[10] = {0};
 	char cmd[50]={0};
-	rx_empty();
+	wifi_rx_empty();
     snprintf(cmd,50,"AT+CIPSEND=%d,%d",mux_id,len);
-    esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+    esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
 
     if (recvFind(">", 5000)) {
-        rx_empty();
+        wifi_rx_empty();
 		esp8285_uart_senddata(buffer,len);// send cmd to esp8285
         esp8285_uart_senddata("\r\n",strlen("\r\n"));// send cmd to esp8285
         return recvFind("SEND OK", 10000);
@@ -685,9 +749,9 @@ bool esp8285_sATCIPCLOSEMulitple(char mux_id)
 	// const char* cmd = "AT+CIPCLOSE=";
     int8_t find;
     char cmd[50]={0};
-	rx_empty();
+	wifi_rx_empty();
     snprintf(cmd,50,"AT+CIPCLOSE=%d\r\n",mux_id);// send cmd to esp8285
-	esp8285_uart_senddata((char *)cmd,strlen(cmd));// send cmd to esp8285
+	esp8285_uart_senddata((const char *)cmd,strlen(cmd));// send cmd to esp8285
     char *recv_data = recvString_2("OK", "link is not", 5000, &find);
     if( recv_data!= NULL)
     {
@@ -701,8 +765,8 @@ bool esp8285_eATCIPCLOSESingle()
 {
 
     int8_t find;
-	char* cmd = "AT+CIPCLOSE\r\n";
-    rx_empty();
+	const char* cmd = "AT+CIPCLOSE\r\n";
+    wifi_rx_empty();
 	esp8285_uart_senddata(cmd,strlen(cmd));// send cmd to esp8285
     char *recv_data = recvString_2("OK", "ERROR", 5000, &find);
     if (recv_data != NULL)
@@ -731,17 +795,323 @@ int esp8285_send(const char *buffer,uint32_t len,uint32_t timeout)
     }
     return send_total_len;
 }
-int esp8285_recv(char *buffer,uint32_t buffer_size,uint32_t *read_len,uint32_t timeout)
+/**
+ * @brief  
+ * @note   
+ * @param  *buffer: 
+ * @param  buffer_size: 
+ * @param  *read_len: 
+ * @param  timeout: 
+ * @retval -1: error -2:EOF -3:timeout -4:close
+ */
+int esp8285_recv(uint8_t *out_buff,uint32_t out_buff_len,uint32_t *read_len,uint32_t timeout, bool first_time_recv)
 {
+    return wifi_uart_recvdata(out_buff,out_buff_len);
+    if (out_buff == NULL)
+    {
+        return -1;
+    }
+    int ret = 0;
+    uint8_t recv_buffer[1024] = {0};
+    uint32_t recv_size = 0;
+    static int32_t frame_sum = 0, frame_len = 0, frame_bak = 0;
+    recv_size = out_buff_len > 1024? 1024:out_buff_len;
+    int recv_len = wifi_uart_recvdata(recv_buffer,recv_size);
+   
+    if(recv_len > 0)
+    { printf("recv_len:%d recv_size:%d\r\n",recv_len,recv_size);
+        if(first_time_recv)
+        {
+            const char *ipd_str = "+IPD,";
+            char *ipd_start = strstr(recv_buffer, ipd_str);
+
+            if (ipd_start != NULL) {
+                // ipd_start += strlen(ipd_str); // 移动到"+IPD,"之后的数据
+                printf("Found +IPD, at position: %ld %c\n", ipd_start - (char *)&recv_buffer[0],*ipd_start);
+                if (sscanf(ipd_start, "+IPD,%d:", &frame_len) == 1) {
+                    char *data_start = strchr(ipd_start, ':') + 1;
+                    int size = recv_len-(data_start-(char *)&recv_buffer[0]);
+                    size = frame_len>size?size:frame_len;
+                    printf("Data length: %d size:%d recv_len:%d\n", frame_len,size,recv_len);
+                    printf("Data: %.*s\n", frame_len, data_start);
+                    // int pos = data_start-recv_buffer;
+                    
+                    memcpy(out_buff,recv_buffer,size);
+                    if (read_len) {
+                        *read_len = size;
+                    }
+                    frame_len -=size;
+                    if(frame_len>0) ret = 1;
+                    else
+                    ret = 0;
+                } else {
+                    printf("Failed to parse data length.\n");
+                    ret = -1;
+                }
+            } else {
+                printf("No +IPD, found in the data.\n");
+                ipd_start = strstr(recv_buffer,"CLOSED\r\n");
+                if(ipd_start != NULL)
+                {
+                    ret = -4;
+                }
+                else
+                    ret = -1;
+            }
+        }
+        else
+        {
+
+        }
+        
+    }
+    return ret;
+    #if 0
     int err = 0, size = 0;
+    
+
+    
     static bool socket_eof = false;
-    enum fsm_state { IDLE, IPD, DATA, EXIT } State = IDLE;
-    return 0;
+    static int8_t mux_id = -1;
+    static int32_t frame_sum = 0, frame_len = 0, frame_bak = 0;
+    enum fsm_state { IDLE, IPD, DATA, EXIT } State = IDLE;//数据接收状态
+    uint32_t  interrupt = get_time_ms(),uart_recv_len = 0, res = 0;
+    uint32_t tmp_bak = 0, tmp_state = 0, tmp_len = 0, tmp_pos = 0, tmp_eof = 0;
+    // printf("start recv interrupt:%d\n",interrupt);
+    /*判断是否为第一次接收，如果为接收第一帧则解析帧头*/
+    if (first_time_recv) {
+        frame_sum = frame_len = 0;
+        socket_eof = false;
+    }
+    
+
+    if(frame_len>0)
+    {
+        int length = out_buff_len > frame_len ? frame_len: out_buff_len;
+        tmp_len = 0;
+        length = length > 1024 ? 1024: length;
+        printf("data have data: tmp_len:%d length:%d frame_len:%d\n",tmp_len,length,frame_len);
+        while((get_time_ms()-interrupt) < timeout)
+        {
+            
+            res = wifi_uart_recvdata(recv_buffer+tmp_len,length-tmp_len);
+            // printf("res=%d\n",res);
+            if(res>0)
+            {
+                interrupt = get_time_ms();
+                tmp_len += res;
+            }
+            else
+            {
+                continue;
+            }
+            if(length==tmp_len)
+            {
+                break;
+            }
+        }
+        frame_len -= tmp_len;
+        // if(tmp_len==0) 
+        frame_sum = frame_len = 0;
+        socket_eof = false;
+        printf("tmp_len:%d frame_len:%d size:%d uart_recv_len:%d\n",tmp_len,frame_len,size,uart_recv_len);
+        memcpy(out_buff,recv_buffer,size);
+        if (read_len) {
+            *read_len = size;
+        }
+        return tmp_len;
+    }
+
+    while(socket_eof == false && State != EXIT)
+    {
+        // uart_recv_len = wifi_uart_rx_any();//判断数据缓存区长度
+        // if(uart_recv_len > 0)
+       {
+            if(tmp_len >= 1024)
+            {
+                break;
+            }
+            res = wifi_uart_recvdata(recv_buffer+tmp_len,1);//读取一个字节
+            if(res == 1)
+            {
+                interrupt = get_time_ms();
+                // printf("interrupt:%d\n",interrupt);
+                tmp_pos = tmp_len, tmp_len += 1; // buffer push
+            
+                if (State == IDLE) {
+                    if (recv_buffer[tmp_pos] == '+') {
+                        tmp_state = 1, tmp_bak = tmp_pos, State = IPD;//tmp_bak记录帧头起始字符位置
+                        continue;
+                    } else {
+                        printf("other (%02X) %c\n", recv_buffer[tmp_pos],recv_buffer[tmp_pos]);
+                        tmp_len -= 1; // clear don't need data, such as (0D)(0A)
+                        continue;
+                    }
+                    continue;
+                }
+                if (State == IPD) {
+
+                    if (tmp_pos - tmp_bak > 12) { // Over the length of the '+IPD,3,1452:' or '+IPD,1452:'
+                        tmp_state = 0, State = IDLE;
+                        continue;
+                    }
+
+                    if (0 < tmp_state && tmp_state < 5) {
+                        printf("(%d, %02X) [%d, %02X]\n", tmp_pos, recv_buffer[tmp_pos], tmp_pos - tmp_bak, ("+IPD,")[tmp_pos - tmp_bak]);
+                        if (recv_buffer[tmp_pos] == ("+IPD,")[tmp_pos - tmp_bak]) {
+                            tmp_state += 1; // tmp_state 1 + "IPD," to tmp_state 5
+                        } else {
+                            tmp_state = 0, State = IDLE;
+                        }
+                        continue;
+                    }
+
+                    if (tmp_state == 5 && recv_buffer[tmp_pos] == ':')
+                    {
+                        tmp_state = 6, State = IDLE;
+                        recv_buffer[tmp_pos + 1] = '\0'; // lock recv_buffer
+                        printf("%s | is `IPD` tmp_bak %d tmp_len %d command %s\n", __func__, tmp_bak, tmp_len, recv_buffer + tmp_bak);
+                        char *index = strstr((char *)recv_buffer + tmp_bak + 5 /* 5 > '+IPD,' and `+IPD,325:` in recv_buffer */, ",");
+                        int ret = 0, len = 0;
+                        if (index) { // '+IPD,3,1452:'
+                            ret = sscanf((char *)recv_buffer + tmp_bak, "+IPD,%hhd,%d:", &mux_id, &len);
+                            if (ret != 2 || mux_id < 0 || mux_id > 4 || len <= 0) {
+                                ; // Misjudge or fail, return, or clean up later
+                            } else {
+                                tmp_len = tmp_bak, tmp_bak = 0; // Clean up the commands in the buffer and roll back the data
+                                frame_len = len, State = DATA;
+                            }
+                        } else { // '+IPD,1452:'
+                            ret = sscanf((char *)recv_buffer + tmp_bak, "+IPD,%d:", &len);
+                            if (ret != 1 || len <= 0) {
+                                ; // Misjudge or fail, return, or clean up later
+                            } else {
+                                tmp_len = tmp_bak, tmp_bak = 0; // Clean up the commands in the buffer and roll back the data
+                                frame_len = len, State = DATA;//记录接收数据帧长度
+                                printf("%s | IPD frame_len %d\n", __func__, frame_len);
+                            }
+                        }
+                        continue;
+                    }
+                    continue;
+                }
+                if (State == DATA) {
+                    // printf("%s | frame_len %d tmp_len %d tmp_buf[tmp_pos] %02X\n", __func__, frame_len, tmp_len, recv_buffer[tmp_pos]);
+                    
+                    // frame_len -= tmp_len, tmp_len = 0; // get data
+                    frame_len -=res;
+
+                    if (frame_len < 0) { // already frame_len - tmp_len before (not frame_len <= 0)
+                        tmp_eof = 0;
+                        if (frame_len == -1 && recv_buffer[tmp_pos] == 'C') { // wait "CLOSED\r\n"
+                            frame_bak = frame_len;
+                            tmp_state = 7;
+                            continue;
+                        }
+                        if (tmp_state == 6 && recv_buffer[tmp_pos] == '\r') {
+                            tmp_state = 7;
+                            continue;
+                        }
+                        if (tmp_state == 7 && recv_buffer[tmp_pos] == '\n') {
+                            if (frame_len == -2) { // match +IPD EOF （\r\n）
+                                tmp_state = 0, State = IDLE;
+                                // After receive complete, confirm the data is enough
+                                size = wifi_uart_rx_any();
+                                // printk("%s | size %d out_buff_len %d\n", __func__, size, out_buff_len);
+                                if (size >= out_buff_len) { // data enough
+                                    // printk("%s | recv out_buff_len overflow\n", __func__);
+                                    State = EXIT;
+                                }
+                            } else if (frame_len == -8 && frame_bak == -1)  {
+                                // printk("%s | Get 'CLOSED'\n", __func__);
+                                socket_eof = true;
+                                frame_bak = 0, tmp_state = 0, State = EXIT;
+                            } else {
+                                tmp_state = 6;
+                            }
+                            continue;
+                        }
+                        
+                        // 存在异常，没有得到 \r\n 的匹配，并排除 CLOSED\r\n 的指令触发的可能性，意味着传输可能越界出错了 \r\n ，则立即回到空闲状态。
+                        if (frame_len <= -1 && frame_bak != -1) {
+                            // printk("%s | tmp_state %d frame_len %d tmp %02X\n", __func__, tmp_state, frame_len, tmp_buf[tmp_pos]);
+                            State = IDLE;
+                            continue;
+                        }
+                    } else {
+                        // for(int i = 0; i < tmp_len; i++) {
+                        //     int tmp = tmp_buf[i];
+                        //     printk("[%02X]", tmp);
+                        // }
+                        // printk("%s | frame_len %d tmp_len %d\n", __func__, frame_len, tmp_pos + 1);
+                        // printk("%.*s", tmp_len, tmp_buf);
+                        // if (!Buffer_Puts(&nic->buffer, tmp_buf, (tmp_pos + 1))) {
+                        //     printk("%s | network->buffer overflow Buffer Max %d Size %d\n", __func__, ESP8285_BUF_SIZE, Buffer_Size(&nic->buffer));
+                        //     State = EXIT;
+                        // } else {
+                            // reduce data len
+                            // printf("[%c]", recv_buffer[tmp_pos]);
+                            // frame_sum += (tmp_pos + 1);
+                        // }
+                        // printf("frame_sum %d frame_len %d tmp_len %d\n", frame_sum, frame_len, tmp_pos + 1);
+                        if ((frame_len == 0) || (tmp_len>=1024)) {
+                            // After receive complete, confirm the data is enough
+                            // size = Buffer_Size(&nic->buffer);
+                            // size = wifi_uart_rx_any();
+                            // printk("%s | size %d out_buff_len %d\n", __func__, size, out_buff_len);
+                            // if (size >= out_buff_len) { // data enough
+                                // printk("%s | recv out_buff_len overflow\n", __func__);
+                                tmp_eof = 1;
+                                break;
+                                // State = EXIT;
+                            // }
+                        }
+                    }
+                    continue;
+                }
+
+                continue;
+
+            } else {
+                printf("recv len:%d\n",res);
+                State = EXIT;
+            }
+
+            continue;
+        }
+    
+        if (get_time_ms() - interrupt > timeout) {
+            if(tmp_len>0)
+            printf("uart timeout break %ld %d %d\r\n", get_time_ms(), interrupt, timeout);
+            break; // uart no return data to timeout break
+        }
+    
+        msleep(10); 
+        //         if (tmp_eof > 0 && tmp_eof++ > 100) { // 806400 tmp_eof 10 > one byte so 115200 > tmp_eof * 8 
+        //     // printk("size %d\r\n", size);
+        //     break; // sometimes communication no eof(\r\n)
+        // }
+    } 
+    
+    size = tmp_len > out_buff_len ? out_buff_len : tmp_len;
+    printf("tmp_len:%d frame_len:%d size:%d uart_recv_len:%d\n",tmp_len,frame_len,size,uart_recv_len);
+    // Buffer_Gets(&nic->buffer, (uint8_t *)out_buff, size);
+    memcpy(out_buff,recv_buffer,size);
+    if (read_len) {
+        *read_len = size;
+    }
+
+    frame_sum -= size;
+
+    // printk(" %s | tail obl %d *dl %d se %d\n", __func__, out_buff_ en, *data_len, size);
+
+    return size;
+    #endif
 }
 bool qATCIPSTA_CUR(void)
 {
 	const char* cmd = "AT+CIPSTA?";//_CUR
-	rx_empty();
+	wifi_rx_empty();
 	esp8285_uart_senddata(cmd,strlen(cmd));
     esp8285_uart_senddata("\r\n",strlen("\r\n"));
 
@@ -863,6 +1233,7 @@ int esp8285_init(void)
     recv_handle.read_buf_len = ESP8285_BUF_SIZE;
     recv_handle.data_len = 0;
     uart_init(WIFI_UART_NUM);
+    msleep(1);
     uart_configure(WIFI_UART_NUM, 115200, 8, UART_STOP_1,UART_PARITY_NONE);
     uart_set_receive_trigger(WIFI_UART_NUM,UART_RECEIVE_FIFO_1);
     uart_irq_register(WIFI_UART_NUM,UART_RECEIVE,wifi_port_recv_cb,NULL,1);//中断函数接收数据到缓存区
@@ -883,6 +1254,7 @@ int esp8285_init(void)
         uart_receive_data(WIFI_UART_NUM,recv_data,100);
         printf("wifi set baud ok %s\n",recv_data);
         uart_init(WIFI_UART_NUM);
+        msleep(1);
         uart_configure(WIFI_UART_NUM, 921600, 8, UART_STOP_1,UART_PARITY_NONE);
         uart_set_receive_trigger(WIFI_UART_NUM,UART_RECEIVE_FIFO_1);
         uart_irq_register(WIFI_UART_NUM,UART_RECEIVE,wifi_port_recv_cb,NULL,1);//中断函数接收数据到缓存区

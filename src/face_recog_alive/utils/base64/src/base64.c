@@ -7,7 +7,7 @@
  */
 
 #include "base64.h"
-
+#include <stdio.h>
 
 // 计算 Base64 编码后的长度
 size_t calculate_base64_encoded_length(size_t input_length) {
@@ -40,6 +40,8 @@ unsigned char *base64_encode(const unsigned char *src, size_t len, size_t *out_l
 	olen++;					/* nul termination */
 	if (olen < len)
 		return NULL; /* integer overflow */
+	// printf("base64 encode calculate length:%ld\n",olen);
+	out = NULL;
 	out = malloc(olen);
 	if (out == NULL)
 		return NULL;

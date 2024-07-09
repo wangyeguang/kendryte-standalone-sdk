@@ -2,7 +2,7 @@
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-23 11:20:21
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-06 14:38:24
+ * @LastEditTime: 2024-06-26 14:54:26
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\rtc_time.c
  * @Description: 
  * 
@@ -161,30 +161,34 @@ uint64_t timeutils_seconds_since_1970(uint64_t year, uint64_t month,
             ) * 86400
         + (year - 1970) * 31536000;
 }
-static uint32_t mktime(int year,uint32_t month,uint32_t mday,uint32_t hours,uint32_t minutes,uint32_t seconds)
+static uint32_t mktime(int year,char month,char mday,char hours,char minutes,char seconds)
 {
         printf("mktime start:year:%d month:%d mday:%d hours:%d minutes:%d seconds:%d\n",year,month,mday,hours,minutes,seconds);
 
     minutes += seconds / 60;
-    if ((seconds = seconds % 60) < 0) {
+    seconds = seconds % 60;
+    if (seconds < 0) {
         seconds += 60;
         minutes--;
     }
 
     hours += minutes / 60;
-    if ((minutes = minutes % 60) < 0) {
+    minutes = minutes %60;
+    if (minutes< 0) {
         minutes += 60;
         hours--;
     }
 
     mday += hours / 24;
-    if ((hours = hours % 24) < 0) {
+    hours = hours % 24;
+    if (hours < 0) {
         hours += 24;
         mday--;
     }
     month--; // make month zero based
     year += month / 12;
-    if ((month = month % 12) < 0) {
+    month = month % 12;
+    if ((month) < 0) {
         month += 12;
         year--;
     }
@@ -212,7 +216,7 @@ uint32_t getTimestamp()
 {
     int beijing_offset = 28800;
     uint8_t get_hour,get_min,get_sec,get_month,get_day,get_weekday;
-    uint32_t get_year = 0;
+    int get_year = 0;
     ex_rtc_get_time(&get_day,&get_month,&get_year,&get_weekday,&get_hour,&get_min,&get_sec);
     uint32_t current_time = mktime(get_year,get_month,get_day,get_hour,get_min,get_sec)-beijing_offset;
     return current_time;

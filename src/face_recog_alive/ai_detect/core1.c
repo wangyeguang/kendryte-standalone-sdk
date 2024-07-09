@@ -1,8 +1,8 @@
 /*
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-05-14 11:30:32
- * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-07 09:22:35
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-07-02 19:00:22
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\core1.c
  * @Description: 
  * 
@@ -33,13 +33,19 @@
 #define WIFI_SSID "beitababa"
 #define WIFI_PASSWORD "12345678"
 
-uint8_t recv_data[1024];
-
+// uint8_t recv_data[1024];
+/**
+ * @brief  
+ * @note   wifi 连接 tcp通信
+ * @param  *ctx: 
+ * @retval 
+ */
 int core1_function(void *ctx)
 {
+    //测试 malloc
 	board_cfg_t *g_config = (board_cfg_t *)ctx;
-	uint8_t wifi_ssid[32];
-    uint8_t wifi_passwd[32];
+	char wifi_ssid[32];
+    char wifi_passwd[32];
 	uint64_t core = current_coreid();
     uint8_t is_wifi_connected = 0;
     uint8_t is_tcp_connected = 0;
@@ -47,7 +53,7 @@ int core1_function(void *ctx)
 
     memset(wifi_ssid,0,32*sizeof(uint8_t));
     memset(wifi_passwd,0,32*sizeof(uint8_t));
-	if((strlen(g_config->wifi_ssid)>0) && (strlen(g_config->wifi_passwd)>0))
+	if((strlen((const char *)g_config->wifi_ssid)>0) && (strlen((const char *)g_config->wifi_passwd)>0))
 	{
 		memcpy(wifi_ssid,g_config->wifi_ssid,strlen(g_config->wifi_ssid));
 		memcpy(wifi_passwd,g_config->wifi_passwd,strlen(g_config->wifi_passwd));
@@ -64,7 +70,7 @@ int core1_function(void *ctx)
      * 2. 循环接收串口数据
      * 3. 解析并处理串口任务
     */
-    // user_cmd_init();//move to core0
+    // user_cmd_init();
     //init wifi
     /**wifi控制流程：
 	 * 0. 初始化wifi芯片，设置hostname
@@ -91,8 +97,8 @@ int core1_function(void *ctx)
         //   user_cmd_senddata(recv_data,recv_len);
         // }
 		//deal serial port
-        // user_cmd_process(); //move to core0
-        #if 0
+        // user_cmd_process(); //
+        
 		//deal wifi port
 		if(is_wifi_connected==0)//join ap or start ap
 		{	
@@ -102,7 +108,7 @@ int core1_function(void *ctx)
             //     printf("join ap OK server_ip is:%s\r\n",server_ip);
 			// }
 			// else 
-            if(wifi_joinAp(wifi_ssid,wifi_passwd))
+            if(wifi_joinAp((const char *)wifi_ssid,(const char *)wifi_passwd))
 			{
                 get_ip_time = 0;
 				is_wifi_connected = 1;
@@ -110,6 +116,7 @@ int core1_function(void *ctx)
 				wifi_get_ip(server_ip);
 			}
 		}
+        
 		else if(is_tcp_connected == 0) //连接tcp，判断是否连接上ap
 		{
             if(strlen(server_ip)<=0)
@@ -145,10 +152,13 @@ int core1_function(void *ctx)
                 }
             }
 		}
+        #if 1
 		else//接收tcp数据      // 1. 判断是否连接ap或有设备接入wifi
 		{
-            wifi_getTcpStatus();
-			 eAT();
+            // wifi_getTcpStatus();
+			//  eAT();
+            wifi_cmd_process();
+            // wifi_cmd_send("hello world",13);
              //发送本机数据给服务器
              //循环接收服务器下发指令
              //超时1min未接收到服务器数据则断开连接

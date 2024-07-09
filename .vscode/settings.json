@@ -64,10 +64,14 @@
         "rtc.h": "c",
         "string_view": "c",
         "base64.h": "c",
-        "string": "c"
+        "string": "c",
+        "user_cmd.h": "c",
+        "wifi_function.h": "c",
+        "random": "c",
+        "syslog.h": "c"
     },
     "cody.autocomplete.experimental.ollamaOptions": {
-        "url": "http://192.168.0.140:14434",
+        "url": "http://192.168.0.110:14434",
         "model": "codellama"
     },
     "Codegeex.CompletionModel": "CodeGeeX Lite",

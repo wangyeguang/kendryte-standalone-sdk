@@ -1,8 +1,8 @@
 /*
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-05-30 10:58:49
- * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-03 19:12:08
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-07-04 02:42:20
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\wifi_function.c
  * @Description: 
  * 
@@ -40,7 +40,7 @@ bool wifi_disconnect()
 }
 bool wifi_is_connected()
 {
-
+    return true;
 }
 bool wifi_getTcpStatus()
 {
@@ -62,11 +62,24 @@ bool wifi_joinAp(const char *ssid,const char *passwd)
 {
     return esp8285_joinAP(ssid,passwd);
 }
+
+static uint8_t wifi_data[1024];
 bool wifi_cmd_process()        //tcp连接后接收并处理wifi数据
 {
-
+    uint32_t read_len = 0;
+    int ret = esp8285_recv(wifi_data,1024,&read_len,600,1);//test demo
+    if(ret>=0)
+    {
+        wifi_data[read_len] = '\0';
+            printf("wifi recv read_len:%d %s\n",read_len,wifi_data);
+    }
+    return true;
 }
-bool wifi_cmd_send(char *data,int len)
+int wifi_cmd_send(char *data,int len)
 {
-    
+    return esp8285_send(data,len,200);
+}
+int wifi_cmd_recv(uint8_t * buffer,uint32_t buffer_size,uint32_t *read_len,uint32_t timeout, bool first_time_recv)
+{
+    return esp8285_recv(buffer,buffer_size,read_len,timeout,first_time_recv);
 }

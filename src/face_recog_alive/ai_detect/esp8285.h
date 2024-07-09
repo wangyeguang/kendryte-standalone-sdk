@@ -21,8 +21,9 @@ bool eAT(void);
 void get_ip();
 bool esp8285_JoinState(void);
 bool eATCIPSTATUS(char** list);
-bool esp8285_sATCIPSTARTSingle(char* addr, uint32_t port);
+bool esp8285_sATCIPSTARTSingle(const char* addr, uint32_t port);
 bool esp8285_eATCIPCLOSESingle();
+void wifi_rx_empty(void);
 int esp8285_send(const char *buffer,uint32_t len,uint32_t timeout);
-int esp8285_recv(char *buffer,uint32_t buffer_size,uint32_t *read_len,uint32_t timeout);
+int esp8285_recv(uint8_t *out_buff,uint32_t out_buff_len,uint32_t *read_len,uint32_t timeout, bool first_time_recv);
 #endif // !_ESP8285_H

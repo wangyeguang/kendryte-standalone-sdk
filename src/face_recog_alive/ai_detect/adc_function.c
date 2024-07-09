@@ -79,6 +79,7 @@ static int i2c_num = I2C_DEVICE_1;
 static int m_gain = ADS1015_REG_CONFIG_PGA_6_144V;
 static int m_conversionDelay = ADS1115_CONVERSIONDELAY;
 static int m_bitShift = 0;
+
 void adc_init(void)
 {
     fpioa_set_function(33,FUNC_I2C1_SCLK); //
@@ -230,7 +231,7 @@ void startComparator_SingleEnded(int channel, int threshold) {
     i2c_write_reg(ADS1015_REG_POINTER_CONFIG, config);
 }
 
-int getLastConversionResults() {
+int getLastConversionResults(void) {
     // Wait for the conversion to complete
     msleep(m_conversionDelay);
 
@@ -257,7 +258,8 @@ void ads1115_vcc_get_voltage_val(float *acc,float *seat) {
     startComparator_SingleEnded(0, 1000);
     int adc00 = getLastConversionResults();
     setGain(setGainval);
-    int gain = getGain();
+    int gain = 0;
+    gain = getGain();
 
     if (setGainval == ADS1015_REG_CONFIG_PGA_6_144V) {
         multiplier = 0.1875;

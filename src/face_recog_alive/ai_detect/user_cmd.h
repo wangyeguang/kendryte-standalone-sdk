@@ -2,7 +2,7 @@
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-05-09 14:58:38
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-05-15 15:48:47
+ * @LastEditTime: 2024-06-26 19:51:38
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\user_cmd.h
  * @Description: 
  * 
@@ -12,7 +12,6 @@
 #define _USER_CMD_H
 
 #include "stdint.h"
-
 
 // int user_cmd_port_init();
 int user_cmd_init(void);

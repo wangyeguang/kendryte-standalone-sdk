@@ -2,7 +2,7 @@
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-03-29 19:38:04
  * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-06 20:20:54
+ * @LastEditTime: 2024-06-27 21:46:10
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\main.c
  * @Description: 
  * 
@@ -65,7 +65,6 @@
 /*******fixed parameters*******/
 /*******flexible parameters*******/
 #define FACE_REGISTER_MODE FACE_APPEND
-#define MAX_REGISTERED_FACE_NUMBER 100
 #define FACE_RECGONITION_SCORE (80.5)
 
 volatile board_cfg_t g_board_cfg;
@@ -76,7 +75,7 @@ kpu_model_context_t face_detect_task;
 static region_layer_t face_detect_rl;
 static key_point_t key_point;
 static obj_info_t obj_detect_info;
-static float registered_face_features[MAX_REGISTERED_FACE_NUMBER * FEATURE_LEN] = {0.0};
+static float registered_face_features[FACE_DATA_MAX_COUNT * FEATURE_LEN] = {0.0};
 char display_status[32];
 //显示输出图像
 volatile static uint8_t g_dvp_finish_flag = 0;
@@ -91,6 +90,9 @@ volatile static uint8_t g_device_init_flag = 0;
 // License 2> 0x641ca3b44bbfb537 0xc581d1cca2d50fd9
 // License 1>  0xb7fc51dba0921a7e 0x5ee2354d1a5196cf
 // License 2> 0xa3857acfa2a6ce1b 0xed372c8b31952355
+
+// License 1>  0x3ea9d8c89bbf8b4c 0x3e6f980216a6b981
+// License 2> 0x983b024f91e20e03 0x7992d9d057c01c4a
 license_t license[3] =
 { 
   {.lic1_h = 0xb7fc51dba0921a7e ,
@@ -102,10 +104,10 @@ license_t license[3] =
     .lic2_h = 0x641ca3b44bbfb537,
     .lic2_l = 0xc581d1cca2d50fd9},
    
-    {.lic1_h = 0x4b2e47f06872b8fd ,
-     .lic1_l = 0xe7fceec9f3bd8baa,
-     .lic2_h = 0xc81bb5c8cad98558 ,
-     .lic2_l = 0x3102a276215f0c5f}
+    {.lic1_h = 0x3ea9d8c89bbf8b4c ,
+     .lic1_l = 0x3e6f980216a6b981,
+     .lic2_h = 0x983b024f91e20e03 ,
+     .lic2_l = 0x7992d9d057c01c4a}
 };
 // static void ai_done(void *ctx)
 // {
@@ -306,50 +308,43 @@ void system_init(void)
     sysctl_pll_set_freq(SYSCTL_PLL2, FREQ_PLL2_DEFAULT);
     //重新定义gpio引脚功能
     //串口初�?�化在_init_bsp
-  //设置系统时钟
-  sysctl_cpu_set_freq(FREQ_CPU_DEFAULT);
-  //设置系统时钟阈�?�1?7
-  sysctl_clock_set_threshold(SYSCTL_THRESHOLD_AI, 0);
-  //初�?�化dmac
-  dmac_init();
-  plic_init();
-  printf("[F1] Pll0:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL0));
-  printf("[F1] Pll1:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL1));
-  printf("[F1] Pll2:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL2));
-  printf("[F1] cpu:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_CPU));
-  printf("[F1] kpu:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_AI));
-  //使能系统时钟
-  sysctl_clock_enable(SYSCTL_CLOCK_AI);
-  sysctl_set_power_mode(SYSCTL_POWER_BANK6, SYSCTL_POWER_V18);
-  sysctl_set_power_mode(SYSCTL_POWER_BANK7, SYSCTL_POWER_V18);
-  //使能系统�?�?
-  sysctl_enable_irq();
-  rtc_init();
-  rtc_timer_set(2000, 1, 1, 0, 0, 0);
-  // flash_init();
-  w25qxx_init(3, 0);
-  w25qxx_enable_quad_mode();
-
+    //设置系统时钟
+    sysctl_cpu_set_freq(FREQ_CPU_DEFAULT);
+    //设置系统时钟阈�?�1?7
+    sysctl_clock_set_threshold(SYSCTL_THRESHOLD_AI, 0);
+    //初�?�化dmac
+    dmac_init();
+    plic_init();
+    printf("[F1] Pll0:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL0));
+    printf("[F1] Pll1:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL1));
+    printf("[F1] Pll2:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_PLL2));
+    printf("[F1] cpu:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_CPU));
+    printf("[F1] kpu:freq:%d\r\n", sysctl_clock_get_freq(SYSCTL_CLOCK_AI));
+    //使能系统时钟
+    sysctl_clock_enable(SYSCTL_CLOCK_AI);
+    sysctl_set_power_mode(SYSCTL_POWER_BANK6, SYSCTL_POWER_V18);
+    sysctl_set_power_mode(SYSCTL_POWER_BANK7, SYSCTL_POWER_V18);
+    //使能系统�?�?
+    sysctl_enable_irq();
+    rtc_init();
+    rtc_timer_set(2000, 1, 1, 0, 0, 0);
+    // flash_init();
+    w25qxx_init(3, 0);
+    w25qxx_enable_quad_mode();
+    uint8_t manuf_id, device_id;
+    w25qxx_read_id(&manuf_id, &device_id);
+    printf("manuf_id:0x%02x, device_id:0x%02x\r\n", manuf_id, device_id);
     /* Init SPI IO map and function settings */
-  sysctl_set_spi0_dvp_data(1);
+    sysctl_set_spi0_dvp_data(1);
 
-  //set LED
-  fpioa_set_function(20,FUNC_GPIO1);//IR_LED
-  fpioa_set_function(19,FUNC_GPIO2);//W_LED
-  gpio_init();
-  gpio_set_drive_mode(1, GPIO_DM_OUTPUT);
-  gpio_set_pin(1, GPIO_PV_HIGH);
-  gpio_set_drive_mode(2, GPIO_DM_OUTPUT); //high is on, low is off
-  gpio_set_pin(2, GPIO_PV_HIGH);
-  //get otp data unuse
-  // sysctl_clock_enable(SYSCTL_CLOCK_OTP);
-  // uint32_t otp_data = 0;
-  // printf("otp data:");
-  // for(int i=0;i<64;i++)
-  // {
-  //   printf(" %x", otp1[i]);
-  // }
-  // printf("\r\n");
+    //set LED
+    fpioa_set_function(20,FUNC_GPIO1);//IR_LED
+    fpioa_set_function(19,FUNC_GPIO2);//W_LED
+    gpio_init();
+    gpio_set_drive_mode(1, GPIO_DM_OUTPUT);
+    gpio_set_pin(1, GPIO_PV_HIGH);
+    gpio_set_drive_mode(2, GPIO_DM_OUTPUT); //high is on, low is off
+    gpio_set_pin(2, GPIO_PV_HIGH);
 }
 
 
@@ -454,7 +449,8 @@ void lcd_cam_init()
     // dvp_config_interrupt(DVP_CFG_START_INT_ENABLE | DVP_CFG_FINISH_INT_ENABLE, 1);
     plic_irq_enable(IRQN_DVP_INTERRUPT);
 
-    gc0328_init();
+    int ret = gc0328_init();
+    printf("gc0328 init ret:%d\n",ret);
     open_gc0328_1();//红�??
     // open_gc0328_0();//RGB
     kpu_image.pixel = 3;
@@ -520,15 +516,21 @@ void watchdog_feed(uint8_t id)
     wdt_feed(id);
 }
 
-static const char unlock_font[6] = {0xce,0xb4,0xcb,0xf8,0xb6,0xa8}; //GB2312
-static const char lock_font[6] = {0xd2,0xd1,0xcb,0xf8,0xb6,0xa8};
+static uint8_t unlock_font[6] = {0xce,0xb4,0xcb,0xf8,0xb6,0xa8}; //GB2312
+static uint8_t lock_font[6] = {0xd2,0xd1,0xcb,0xf8,0xb6,0xa8};
+
+/**
+ * @brief  
+ * @note   
+ * @retval 
+ */
 int main(void)
 {
    static uint64_t last_feed_ms = 0;
     uint64_t tim = 0;
     system_init();
     uint64_t core = current_coreid();
-    int data;
+    int data =0;
     printf("Core %ld Hello world\n", core);
     printf("wdt time is %d ms\n", wdt_init(0, 8000, wdt0_irq,NULL)); // wdt enable timeout 8000ms
     printf("unique_id=%lx\n",get_chip_number());
@@ -544,12 +546,12 @@ int main(void)
     // flash_read(0xA00000,KMODEL_SIZE,model_data_align);
 
     //初始化LCD
-   
+    
 
-
-    lcd_cam_init();
 
     
+
+   
      image_t show_image;
     show_image.pixel = 2;
     show_image.width = 240;
@@ -565,6 +567,7 @@ int main(void)
     status_image.width = 240;
     status_image.height = 40;
     image_init(&status_image);
+    lcd_cam_init();
     /*ai init*/
     int ret = ai_init();
     // ai_init(model_data_align);
@@ -614,7 +617,7 @@ int main(void)
     register_core1(core1_function, (void *)&g_board_cfg);
 
     /*init rtc*/
-    ex_rtc_init();
+    ex_rtc_init(); 
     // printf("set rtc result:%d\n",ex_rtc_set_time(9,5,2024,4,21,34,00));
     // int year,month,day,weekday,hour,min,sec;
     // ex_rtc_get_time((uint8_t *)&day,(uint8_t *)&month,(uint8_t *)&year,(uint8_t *)&weekday,(uint8_t *)&hour,(uint8_t *)&min,(uint8_t *)&sec);
@@ -628,11 +631,13 @@ int main(void)
     speaker_init();
     //   lcd_draw_string(10, 300, "δ����", WHITE);
     watchdog_init(0); /* init watch dog */
-    user_cmd_init();/*init uart port*/
+    /*load face feature */
+    flash_load_face_info();
+    flash_get_face_feature(registered_face_features);
     int fps=0;
     int led_on_time = get_time_ms();
     int cam_ir_on = 0;
-    camera_switch(cam_ir_on);
+    camera_switch(cam_ir_on);//1 红外模式 0 rgb模式
     while(1)
     {
         //读取摄像头数�?1?7
@@ -648,7 +653,7 @@ int main(void)
         /* run face detect */
         #if 1
         ai_run_fd(&obj_detect_info);
-        uint32_t face_found = 0;
+        int face_found = 0;
         if(obj_detect_info.obj_number>0 && cam_ir_on ==1){led_w_on();continue;}//提高帧率
         for(uint32_t i = 0; i < obj_detect_info.obj_number; i++)
         {
@@ -658,7 +663,7 @@ int main(void)
             y2_tmp = (uint32_t)obj_detect_info.obj[i].y2;
             if((y2_tmp-y1_tmp)<50)
               continue;
-            image_absolute_src_resize(&kpu_image, &resized_image, &x1_tmp, &y1_tmp, &x2_tmp, &y2_tmp, margin, false);
+            image_absolute_src_resize(&kpu_image, &resized_image, (uint16_t *)&x1_tmp, (uint16_t *)&y1_tmp, (uint16_t *)&x2_tmp, (uint16_t *)&y2_tmp, margin, false);
             ai_run_keypoint(&kpu_image, &resized_image, x1_tmp, y1_tmp, x2_tmp, y2_tmp, &key_point);
             // draw_key_point((uint32_t *)display_image.addr, &key_point, RED); //
             ai_run_feature(&resized_image, i);
@@ -670,7 +675,7 @@ int main(void)
         {
             float score_max = 0;
             uint32_t score_index = 0;
-            score_index = calulate_score(features_tmp[i], registered_face_features, MAX_REGISTERED_FACE_NUMBER, &score_max);
+            score_index = calulate_score(features_tmp[i], registered_face_features, FACE_DATA_MAX_COUNT, &score_max);
             if(score_max >= face_thresh)
             {
                 draw_edge((uint32_t *)display_image.addr, &obj_detect_info, i, GREEN);
@@ -681,7 +686,7 @@ int main(void)
                 {
                     sprintf(display_status, "%s_%d", "recognized", score_index);
                 }
-                ram_draw_string((uint32_t *)display_image.addr, obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1 - 16, display_status, GREEN);
+                ram_draw_string((uint32_t *)display_image.addr, obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1 - 16, (uint8_t *)display_status, GREEN);
                 printf("RECOGNIZED FACE: <%d> <%d> <%d> <%d>\n", obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2);
             } else
             {
@@ -739,7 +744,7 @@ int main(void)
             led_w_off();
             led_on_time = tim;
         }
-        user_cmd_process();//do uart recv something
+        // user_cmd_process();//do uart recv something
         //feed
         if ((tim - last_feed_ms) > WATCH_DOG_FEED_TIME_MS)
         {
@@ -747,10 +752,9 @@ int main(void)
              int year=0;
             ex_rtc_get_time((uint8_t *)&day,(uint8_t *)&month,(int *)&year,(uint8_t *)&weekday,(uint8_t *)&hour,(uint8_t *)&min,(uint8_t *)&sec);
             sprintf(display_status,"%4d-%02d-%02d %02d:%02d",year,month,day,hour,min);
-            ram_draw_string((uint32_t *)time_image.addr,5,5,display_status,WHITE);
-             lcd_draw_picture(0, 0, 240, 240, (uint8_t *)time_image.addr);//显示图像位置
-             memset(time_image.addr,0,240*80);
-;
+            ram_draw_string((uint32_t *)time_image.addr,5,5,(uint8_t *)display_status,WHITE);
+            lcd_draw_picture(0, 0, 240, 240, (uint8_t *)time_image.addr);//显示图像位置
+            memset(time_image.addr,0,240*80);
             // lcd_draw_string(0, 0, display_status, WHITE,BLUE);//show time update/s
             if(obj_detect_info.obj_number>0) {led_on_time = get_time_ms(); led_w_on();}
             // printk("heap:%ld KB\r\n", get_free_heap_size() / 1024);

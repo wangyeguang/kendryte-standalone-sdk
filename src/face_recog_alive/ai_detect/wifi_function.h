@@ -1,3 +1,13 @@
+/*
+ * @Author: Wangyg wangyeguang521@163.com
+ * @Date: 2024-05-30 10:58:41
+ * @LastEditors: Wangyg wangyeguang521@163.com
+ * @LastEditTime: 2024-06-27 22:13:28
+ * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\wifi_function.h
+ * @Description: 
+ * 
+ * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
+ */
 #ifndef _WIFI_FUNCTION
 #define _WIFI_FUNCTION
 #include "stdbool.h"
@@ -14,6 +24,6 @@ bool wifi_getTcpStatus();
 void wifi_get_ip(char *server_ip);
 bool wifi_joinAp(const char *ssid,const char *passwd);
 bool wifi_cmd_process();        //tcp连接后接收并处理wifi数据
-bool wifi_cmd_send(char *data,int len);
+int wifi_cmd_send(char *data,int len);
 
 #endif // !_WIFI_FUNCTION

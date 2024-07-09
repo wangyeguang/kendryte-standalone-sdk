@@ -1,8 +1,8 @@
 /*
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-04-02 10:37:12
- * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-05-11 14:51:28
+ * @LastEditors: Wangyg wangyeguang521@163.com
+ * @LastEditTime: 2024-06-27 20:03:37
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\device_config.h
  * @Description: 
  * 
@@ -58,24 +58,26 @@
 #define FONT_DATA_ADDR (0x500000)
 #define FONT_DATA_SIZE (267264)  //gb2312
 
-#define BOARD_CFG_ADDR (0x910000)
+#define BOARD_CFG_ADDR (0x710000)
 
-#define CONFIG_DATA_ADDR 0x910000 //9M+64K
-#define FACE_ADDR               0x9E0000
+#define CONFIG_DATA_ADDR 0x710000 //7M+64K
+//人脸特征配置
+#define FACE_ADDR               0x7E0000
 //人臉特征值地址 1M
-#define FACE_FEATURE_ADDR 0xA00000 //10M
+#define FACE_FEATURE_ADDR 0x900000 //9M
 #define FACE_HEADER                                 (0x55AA5503)
 #define FACE_DATA_MAX_COUNT                         (256)
 //人臉識別記錄地址
-#define FACE_RECORD_ADDR 0xb00000 //11M
+#define FACE_RECORD_ADDR 0xa00000 //10M
 
-#define PIC_DATA_ADDR 0xd00000 //13M
-
+//显示图像数据地址
+#define PIC_DATA_ADDR 0xC00000 //12M 2M size
 #define UID_LEN                                     (4)
 #define NAME_LEN                                    (16)
 #define NOTE_LEN                                    (16)
 
 //AUDIO DATA
+#define MUSIC_DATA_ADDR 0xE00000 //14M 2M size
 #define AUDIO_LOCK_ADDR (0xE00000)
 #define AUDIO_LOCK_SIZE  (36096)
 #define AUDIO_UNLOCK_ADDR (0xF00000)
