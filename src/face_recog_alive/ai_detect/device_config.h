@@ -71,7 +71,12 @@
 #define FACE_RECORD_ADDR 0xa00000 //10M
 
 //显示图像数据地址
+#define IMG_LCD_SIZE  (240*240*2)
 #define PIC_DATA_ADDR 0xC00000 //12M 2M size
+#define IMG_FACE_PASS_ADDR                          (IMG_RECORD_FACE_ADDR + (116 * 1024 * 1))
+#define IMG_FACE_FAIL_ADDR                          (IMG_RECORD_FACE_ADDR + (116 * 1024 * 2))
+
+
 #define UID_LEN                                     (4)
 #define NAME_LEN                                    (16)
 #define NOTE_LEN                                    (16)

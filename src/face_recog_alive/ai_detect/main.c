@@ -1,8 +1,8 @@
 /*
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-03-29 19:38:04
- * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-27 21:46:10
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-07-10 16:48:44
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\main.c
  * @Description: 
  * 
@@ -638,6 +638,11 @@ int main(void)
     int led_on_time = get_time_ms();
     int cam_ir_on = 0;
     camera_switch(cam_ir_on);//1 红外模式 0 rgb模式
+
+    //test code
+    w25qxx_read_data(PIC_DATA_ADDR,show_image.addr,240*240*2,W25QXX_STANDARD);
+    lcd_draw_picture(0, 40, 240, 240,  (uint8_t *)show_image.addr);
+    int record_flag  = 0;
     while(1)
     {
         //读取摄像头数�?1?7
@@ -655,6 +660,7 @@ int main(void)
         ai_run_fd(&obj_detect_info);
         int face_found = 0;
         if(obj_detect_info.obj_number>0 && cam_ir_on ==1){led_w_on();continue;}//提高帧率
+        if(obj_detect_info.obj_number >0){printf("obj_number:%d\n",obj_detect_info.obj_number);}
         for(uint32_t i = 0; i < obj_detect_info.obj_number; i++)
         {
             x1_tmp = (uint32_t)obj_detect_info.obj[i].x1;
@@ -667,6 +673,17 @@ int main(void)
             ai_run_keypoint(&kpu_image, &resized_image, x1_tmp, y1_tmp, x2_tmp, y2_tmp, &key_point);
             // draw_key_point((uint32_t *)display_image.addr, &key_point, RED); //
             ai_run_feature(&resized_image, i);
+            if(record_flag == 0)//record first recog
+            {
+                memcpy(registered_face_features,&features_tmp[i],FEATURE_LEN*sizeof(float));
+                printf("record feature :");
+                for(int i=0;i<FEATURE_LEN;i++)
+                {
+                    printf("%f ",*(registered_face_features+i));
+                }
+                printf("\r\n");
+                record_flag = 1;
+            }
             // alive_tmp[i] = ai_run_alive(&kpu_image, &resized_image, obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2, &key_point);
         }
         /* run key point detect */
@@ -679,19 +696,19 @@ int main(void)
             if(score_max >= face_thresh)
             {
                 draw_edge((uint32_t *)display_image.addr, &obj_detect_info, i, GREEN);
-                if(alive_tmp[i] > 0 && g_camera_no == 1)
-                {
-                    sprintf(display_status, "%s_%s_%d", "recognized", "alive", score_index);
-                } else
-                {
+                // if(alive_tmp[i] > 0 && g_camera_no == 1)
+                // {
+                //     sprintf(display_status, "%s_%s_%d", "recognized", "alive", score_index);
+                // } else
+                // {
                     sprintf(display_status, "%s_%d", "recognized", score_index);
-                }
+                // }
                 ram_draw_string((uint32_t *)display_image.addr, obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1 - 16, (uint8_t *)display_status, GREEN);
-                printf("RECOGNIZED FACE: <%d> <%d> <%d> <%d>\n", obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2);
+                printf("RECOGNIZED FACE: <%d> <%d> <%d> <%d> score:%f\n", obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2,score_max);
             } else
             {
                 draw_edge((uint32_t *)display_image.addr, &obj_detect_info, i, BLUE);
-                printf("DETECTED FACE: <%d> <%d> <%d> <%d>\n", obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2);
+                printf("DETECTED FACE: <%d> <%d> <%d> <%d> score:%f\n", obj_detect_info.obj[i].x1, obj_detect_info.obj[i].y1, obj_detect_info.obj[i].x2, obj_detect_info.obj[i].y2,score_max);
             }
         }
         #endif

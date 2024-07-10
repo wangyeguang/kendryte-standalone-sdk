@@ -1,8 +1,8 @@
 /*
  * @Author: yeguang wang wangyeguang521@163.com
  * @Date: 2024-05-09 14:58:17
- * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-27 17:25:42
+ * @LastEditors: yeguang wang wangyeguang521@163.com
+ * @LastEditTime: 2024-07-10 22:40:50
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\user_cmd.c
  * @Description: 
  * 
@@ -354,7 +354,7 @@ void uart_callback_list_init(uart_callback_list_t *list)
 }
 
 // 添加回调函数到列表
-int uart_callback_list_add(uart_callback_list_t *list, uart_callback_t callback, void *context)
+static int uart_callback_list_add(uart_callback_list_t *list, uart_callback_t callback, void *context)
 {
     if (list->count >= MAX_CALLBACKS)
     {

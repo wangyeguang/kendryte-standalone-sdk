@@ -1,13 +1,3 @@
-/*
- * @Author: Wangyg wangyeguang521@163.com
- * @Date: 2024-04-23 11:20:21
- * @LastEditors: Wangyg wangyeguang521@163.com
- * @LastEditTime: 2024-06-12 11:44:03
- * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\face_info.h
- * @Description: 
- * 
- * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
- */
 #ifndef __FACE_INFO_H
 #define __FACE_INFO_H
 

@@ -64,7 +64,7 @@ int __attribute__((weak)) os_entry(int core_id, int number_of_cores, int (*user_
     /* Call main if there is no OS */
     return user_main(0, 0);
 }
-
+#define UART_CTRL
 void _init_bsp(int core_id, int number_of_cores)
 {
     extern int main(int argc, char *argv[]);
@@ -76,10 +76,13 @@ void _init_bsp(int core_id, int number_of_cores)
         /* Initialize bss data to 0 */
         init_bss();
         /* Init UART */
-        // fpioa_set_function(4, FUNC_UART3_RX);
-        // fpioa_set_function(5, FUNC_UART3_TX);
+        #if defined(UART_CTRL)
+        fpioa_set_function(4, FUNC_UART3_RX);
+        fpioa_set_function(5, FUNC_UART3_TX);
+        #else
         fpioa_set_function(30, FUNC_UART3_RX);
         fpioa_set_function(31, FUNC_UART3_TX);
+        #endif
         uart_debug_init(UART_DEVICE_3);
         dmac_init();
         /* Init FPIOA */

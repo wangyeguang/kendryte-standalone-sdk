@@ -2,7 +2,7 @@
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-05-14 11:30:32
  * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-07-02 19:00:22
+ * @LastEditTime: 2024-07-10 19:45:28
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\core1.c
  * @Description: 
  * 
@@ -164,7 +164,7 @@ int core1_function(void *ctx)
              //超时1min未接收到服务器数据则断开连接
 		}
         #endif
-        msleep(100);
+        // msleep(200);
     }
     
 #if 0
