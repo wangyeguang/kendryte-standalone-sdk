@@ -2,7 +2,7 @@
  * @Author: Wangyg wangyeguang521@163.com
  * @Date: 2024-05-14 11:30:32
  * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-07-10 19:45:28
+ * @LastEditTime: 2024-07-11 14:55:41
  * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\core1.c
  * @Description: 
  * 
@@ -29,11 +29,27 @@
 #include "sleep.h"
 #include "uarths.h"
 #include "face_info.h"
+#include "atomic.h"
 
 #define WIFI_SSID "beitababa"
 #define WIFI_PASSWORD "12345678"
 
 // uint8_t recv_data[1024];
+
+// volatile Queue_t q_core0; // Queue declaration
+volatile Queue_t q_core1; // Queue declaration
+// static volatile spinlock_t q_core0_lock;
+static volatile spinlock_t q_core1_lock;
+
+static void queue_core1_lock(void)
+{
+    spinlock_lock(&q_core1_lock);
+}
+
+static void queue_core1_unlock(void)
+{
+    spinlock_unlock(&q_core1_lock);
+}
 /**
  * @brief  
  * @note   wifi 连接 tcp通信
@@ -42,14 +58,13 @@
  */
 int core1_function(void *ctx)
 {
-    //测试 malloc
 	board_cfg_t *g_config = (board_cfg_t *)ctx;
 	char wifi_ssid[32];
     char wifi_passwd[32];
 	uint64_t core = current_coreid();
     uint8_t is_wifi_connected = 0;
     uint8_t is_tcp_connected = 0;
-    printf("Core %ld Hello world\n", core);
+    printf("Core %ld Start !!!!\n", core);
 
     memset(wifi_ssid,0,32*sizeof(uint8_t));
     memset(wifi_passwd,0,32*sizeof(uint8_t));
@@ -79,8 +94,9 @@ int core1_function(void *ctx)
      * 3. 等待控制端下发指令
      * 4. 解析并处理wifi指令
     */
+    bool ret = 0;
     wifi_init();
-    bool ret = wifi_setHostname();
+    ret = wifi_setHostname();
 	printf("[esp8285]: Set hostname ret:%d\n",ret);
     int work_mode = 0;// 0:join wifi 1: 连接tcp 2:接收tcp数据
     int recv_len = 0;
@@ -88,8 +104,41 @@ int core1_function(void *ctx)
     int get_ip_time = 0;
     int connect_time = 0;
 
+    bool queue_stat = false;
+    net_task_t *task = NULL;
+    uint8_t have_task = 0;
+
     while (1)
     {
+        queue_core1_lock();
+        if (!q_isEmpty(&q_core1))
+        {
+            queue_stat = q_pop(&q_core1, &task);
+            if (queue_stat && task)
+            {
+                have_task = 1;
+            }
+        }
+        queue_core1_unlock();
+        if(have_task)
+        {
+            have_task = 0;
+            if(task)
+            {
+                switch (task->task_type)
+                {
+                case TASK_UPLOAD:
+                    /* code */
+                    break;
+                case TASK_CAL_PIC_FEA:
+                    break;
+                case TASK_CAL_PIC_FEA_RES:
+                    break;
+                default:
+                    break;
+                }
+            }
+        }
         // printf("core %ld is runing\n",core);
         // if((recv_len = user_cmd_recvdata(recv_data,1024))>0)
         // {
@@ -149,6 +198,7 @@ int core1_function(void *ctx)
                     connect_time = 0;
                     printf("connect to server success\n");
                     is_tcp_connected = 1;
+                    wifi_cmd_send_login();
                 }
             }
 		}
@@ -157,11 +207,14 @@ int core1_function(void *ctx)
 		{
             // wifi_getTcpStatus();
 			//  eAT();
-            wifi_cmd_process();
+            ret = wifi_cmd_process();
+            if(ret == false)
+            {
+                is_tcp_connected = 0;
+            }
             // wifi_cmd_send("hello world",13);
              //发送本机数据给服务器
              //循环接收服务器下发指令
-             //超时1min未接收到服务器数据则断开连接
 		}
         #endif
         // msleep(200);

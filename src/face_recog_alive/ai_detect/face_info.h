@@ -62,7 +62,8 @@ typedef struct _face_save_info_t
 }face_save_info_t __attribute__((aligned(8)));
 extern volatile face_save_info_t g_face_save_info;
 extern volatile board_cfg_t g_board_cfg;
-
+#include "image_process.h"
+extern image_t kpu_image;
 int flash_get_saved_feature_number(void);   //获取人脸特征数量
 int flash_get_face_info(face_info_t *face_info, uint32_t id);
 int flash_update_face_info(face_info_t *face_info);

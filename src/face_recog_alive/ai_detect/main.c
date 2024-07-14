@@ -1,13 +1,3 @@
-/*
- * @Author: yeguang wang wangyeguang521@163.com
- * @Date: 2024-03-29 19:38:04
- * @LastEditors: yeguang wang wangyeguang521@163.com
- * @LastEditTime: 2024-07-10 16:48:44
- * @FilePath: \kendryte-standalone-sdk-new\src\face_recog_alive\ai_detect\main.c
- * @Description: 
- * 
- * Copyright (c) 2024 by ${git_name_email}, All Rights Reserved. 
- */
 /* Copyright 2018 Canaan Inc.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
@@ -69,7 +59,8 @@
 
 volatile board_cfg_t g_board_cfg;
 static image_t display_image;
-static image_t kpu_image, resized_image;
+image_t kpu_image;
+static image_t resized_image;//模型推理使用
 
 kpu_model_context_t face_detect_task;
 static region_layer_t face_detect_rl;
